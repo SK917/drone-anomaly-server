@@ -1,0 +1,23 @@
+# Virtual environment
+venv/
+
+# Python cache / bytecode
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+.env.*
+
+# Model weights / artifacts
+*.pt
+*.onnx
+*.engine
+
+# Logs
+*.log
+
+# Editor / OS files
+.DS_Store
+.vscode/
+.idea/
