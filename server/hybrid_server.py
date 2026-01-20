@@ -14,9 +14,7 @@ from aiortc.sdp import candidate_from_sdp
 from ultralytics import YOLO
 import uvicorn
 
-# =========================
-# CONFIG
-# =========================
+# Config
 HOST = "0.0.0.0"
 PORT = 8000
 
@@ -28,11 +26,10 @@ USE_FP16 = True                # Enable half precision for 2x GPU speedup
 # Anomaly detection - classes that trigger warnings
 ANOMALY_CLASSES = ["bear", "cow"]
 
-# =========================
-# GLOBAL STATE
-# =========================
+# Global State
 app = FastAPI()
 
+# Allowed Access Points
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -69,9 +66,7 @@ latest_annotated_jpeg: Optional[bytes] = None
 annotated_frame_lock = asyncio.Lock()
 frame_dimensions: tuple[int, int] = (0, 0)  # (width, height)
 
-# =========================
-# YOLO INFERENCE
-# =========================
+# YOLO Interference
 def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], float]:
     """Runs YOLO inference. Returns (detections, inference_ms)."""
     t0 = time.time()
@@ -103,13 +98,11 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
             })
     return dets, ms
 
-# =========================
-# INFERENCE WORKER - Only decode when ready
-# =========================
+# Interference Worker
 async def inference_worker():
     """
     Continuously pull frames from WebRTC and run inference.
-    Drops all buffered frames - only processes the LATEST frame.
+    Drops all buffered frames - only processes the latest frame.
     """
     global inference_count, inference_start_time, last_inference_time, inference_fps
     global current_detections, is_inferencing
@@ -183,24 +176,22 @@ async def inference_worker():
             if dets:
                 print(f"\n[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - Found {len(dets)} object(s) ({infer_ms:.1f}ms):")
                 for i, d in enumerate(dets, 1):
-                    anomaly_marker = " ⚠️" if d.get('is_anomaly', False) else ""
+                    anomaly_marker = "!" if d.get('is_anomaly', False) else ""
                     print(f"  {i}. {d['class_name']} ({d['confidence']*100:.1f}%){anomaly_marker}")
             else:
                 print(f"[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - No objects detected ({infer_ms:.1f}ms)")
             
             if anomalies:
-                print(f"⚠️⚠️⚠️ ANOMALY: {', '.join([a['class_name'] for a in anomalies])} ⚠️⚠️⚠️")
+                print(f"ANOMALY: {', '.join([a['class_name'] for a in anomalies])}")
         
         except asyncio.TimeoutError:
-            print("[INFERENCE] ⚠ Timeout waiting for frame")
+            print("[INFERENCE] ! Timeout waiting for frame")
         except Exception as e:
-            print(f"[INFERENCE] ⚠ Error: {type(e).__name__}: {str(e)[:100]}")
+            print(f"[INFERENCE] ! Error: {type(e).__name__}: {str(e)[:100]}")
         finally:
             is_inferencing = False
 
-# =========================
-# ANNOTATION WORKER - Draws bounding boxes
-# =========================
+# Annotation Worker - Draws bounding boxes
 async def annotation_worker():
     """Background worker that draws bounding boxes on frames."""
     global latest_annotated_jpeg
@@ -267,9 +258,7 @@ async def annotation_worker():
         except Exception as e:
             print(f"[ANNOTATION] ⚠ Error: {type(e).__name__}: {str(e)[:100]}")
 
-# =========================
-# API ENDPOINTS
-# =========================
+# API Endpoints
 @app.get("/detections")
 async def get_detections():
     """Get current detections."""
@@ -398,7 +387,7 @@ async def video_view():
   </head>
   <body>
     <div class="container">
-      <h1>🎥 Live Detection Video Stream</h1>
+      <h1>Live Detection Video Stream</h1>
       <p class="info">Real-time YOLO Object Detection with Bounding Boxes</p>
       
       <div id="anomalyWarning" class="anomaly-warning"></div>
@@ -458,7 +447,7 @@ async def video_view():
           if (data.has_anomaly && data.detections) {{
             const anomalies = data.detections.filter(d => d.is_anomaly);
             const anomalyNames = anomalies.map(a => a.class_name.toUpperCase()).join(', ');
-            warning.textContent = `⚠️ ANOMALY DETECTED: ${{anomalyNames}} ⚠️`;
+            warning.textContent = `ANOMALY DETECTED: ${{anomalyNames}}`;
             warning.style.display = 'block';
           }} else {{
             warning.style.display = 'none';
@@ -476,9 +465,7 @@ async def video_view():
 </html>
     """)
 
-# =========================
-# WEBRTC ENDPOINTS (WHIP Protocol)
-# =========================
+# WEBRTC Endpoints (WHIP Protocol)
 @app.post("/whip")
 async def whip(request: Request):
     """Accept WebRTC offer from OBS via WHIP protocol."""
@@ -537,9 +524,7 @@ async def whip_trickle(sid: str, request: Request):
 
     return Response(status_code=204)
 
-# =========================
-# HTML VIEWER
-# =========================
+# HTML Viewer
 @app.get("/")
 def index():
     """Serve the viewer page."""
@@ -675,7 +660,7 @@ def index():
       <p style="text-align: center; opacity: 0.8;">Real-time YOLO Detection • Port {PORT}</p>
       
       <div class="stream-status" id="streamStatus">
-        <span id="streamText">⏳ Waiting for stream...</span>
+        <span id="streamText">Waiting for stream...</span>
       </div>
       
       <div class="stats">
@@ -698,7 +683,7 @@ def index():
       <div id="anomalyWarningContainer"></div>
       
       <div class="detections-container">
-        <h2 style="margin-top: 0;">📋 Detected Objects</h2>
+        <h2 style="margin-top: 0;">Detected Objects</h2>
         <div id="detectionsList">
           <div class="no-detections">No objects detected yet</div>
         </div>
@@ -726,7 +711,7 @@ def index():
             streamText.textContent = '✓ Stream Active - Processing';
           }} else {{
             streamStatus.className = 'stream-status stream-inactive';
-            streamText.textContent = '⏳ Waiting for stream...';
+            streamText.textContent = 'Waiting for stream...';
           }}
           
           // Update anomaly warning
@@ -736,7 +721,7 @@ def index():
             const anomalyNames = anomalies.map(a => a.class_name.toUpperCase()).join(', ');
             anomalyContainer.innerHTML = `
               <div class="anomaly-warning">
-                ⚠️ ANOMALY DETECTED: ${{anomalyNames}} ⚠️
+                ANOMALY DETECTED: ${{anomalyNames}}
               </div>
             `;
           }} else {{
@@ -764,7 +749,7 @@ def index():
               .sort((a, b) => b.confidence - a.confidence)
               .map(det => {{
                 const anomalyClass = det.is_anomaly ? ' anomaly' : '';
-                const anomalyIcon = det.is_anomaly ? ' ⚠️' : '';
+                const anomalyIcon = det.is_anomaly ? '!' : '';
                 const countText = det.count > 1 ? ` (×${{det.count}})` : '';
                 return `
                   <div class="detection-item${{anomalyClass}}">
@@ -790,9 +775,7 @@ def index():
 </html>
     """)
 
-# =========================
-# Startup / Shutdown
-# =========================
+# Server Startup / Shutdown Process
 @app.on_event("startup")
 async def startup():
     global model, device
@@ -844,8 +827,6 @@ async def shutdown():
         await pc.close()
     pcs.clear()
 
-# =========================
 # Run
-# =========================
 if __name__ == "__main__":
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")
