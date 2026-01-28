@@ -65,37 +65,50 @@ latest_raw_frame: Optional[np.ndarray] = None
 latest_annotated_jpeg: Optional[bytes] = None
 annotated_frame_lock = asyncio.Lock()
 
-# YOLO Inference
+# YOLO Inference with ByteTrack for Tracking
+# Use ultralytics built in tracking support with the bytetrack algorithm for stable fps
 def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], float]:
     t0 = time.time()
-    results = model(
+    results = model.track(
         frame_bgr, 
         imgsz=IMG_SIZE, 
         conf=CONFIDENCE, 
         device=device, 
         verbose=False,
         half=USE_FP16,
-        agnostic_nms=True
+        agnostic_nms=True,
+        tracker="bytetrack.yaml",
+        persist=True
     )
     infms = (time.time() - t0) * 1000.0
 
-    dets: List[Dict[str, Any]] = []
-    for r in results:
-        names = getattr(r, "names", {})
-        for b in r.boxes:
-            cls = int(b.cls[0])
-            conf = float(b.conf[0])
+    detections: List[Dict[str, Any]] = []
+    for det in results:
+        names = getattr(det, "names", {})
+        boxes = det.boxes
+        if boxes is None:
+            continue
+        
+        for b in boxes:
+            obj_class = int(b.cls[0])
+            confidence = float(b.conf[0])
             x1, y1, x2, y2 = b.xyxy[0].tolist()
-            class_name = names.get(cls, str(cls))
-            dets.append({
-                "class_id": cls,
+            class_name = names.get(obj_class, str(obj_class))
+            
+            track_id = None
+            if hasattr(b, 'id') and b.id is not None:
+                track_id = int(b.id[0])
+            
+            detections.append({
+                "class_id": obj_class,
                 "class_name": class_name,
-                "confidence": conf,
+                "confidence": confidence,
                 "bbox": [x1, y1, x2, y2],
-                "is_anomaly": class_name.lower() in [ac.lower() for ac in ANOMALY_CLASSES]
+                "track_id": track_id,
+                "is_anomaly": class_name.lower() in [anomaly.lower() for anomaly in ANOMALY_CLASSES]
             })
     
-    return dets, infms
+    return detections, infms
 
 # Inference Worker
 async def inference_worker():
@@ -143,7 +156,7 @@ async def inference_worker():
             
             img = latest_frame.to_ndarray(format="bgr24")
             
-            dets, infer_ms = await asyncio.to_thread(_run_yolo_on_frame, img)
+            detections, infer_ms = await asyncio.to_thread(_run_yolo_on_frame, img)
             
             inference_count += 1
             current_time = time.time()
@@ -157,17 +170,17 @@ async def inference_worker():
             
             # Store detections and raw frame for annotation
             async with detections_lock:
-                current_detections = dets
+                current_detections = detections
             
             global latest_raw_frame
             async with annotated_frame_lock:
                 latest_raw_frame = img.copy()
             
             # Log results
-            anomalies = [d for d in dets if d.get('is_anomaly', False)]
-            if dets:
-                print(f"\n[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - Found {len(dets)} object(s) ({infer_ms:.1f}ms):")
-                for i, d in enumerate(dets, 1):
+            anomalies = [d for d in detections if d.get('is_anomaly', False)]
+            if detections:
+                print(f"\n[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - Found {len(detections)} object(s) ({infer_ms:.1f}ms):")
+                for i, d in enumerate(detections, 1):
                     print(f"  {i}. {d['class_name']} ({d['confidence']*100:.1f}%)")
             else:
                 print(f"[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - No objects detected ({infer_ms:.1f}ms)")
@@ -196,7 +209,7 @@ async def annotation_worker():
             frame = latest_raw_frame
         
         async with detections_lock:
-            dets = current_detections.copy()
+            detections_copy = current_detections.copy()
         
         if frame is None:
             continue
@@ -205,9 +218,10 @@ async def annotation_worker():
             annotated = frame.copy()
             
             # Draw each detection
-            for det in dets:
+            for det in detections_copy:
                 x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
                 is_anomaly = det.get("is_anomaly", False)
+                track_id = det.get("track_id")
                 
                 # Color: red for anomalies, green for normal
                 color = (0, 0, 255) if is_anomaly else (0, 255, 0)
@@ -216,8 +230,11 @@ async def annotation_worker():
                 # Draw bounding box
                 cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
                 
-                # Label
+                # Label with track ID if available
                 label = f"{det['class_name']} {det['confidence']*100:.1f}%"
+                if track_id is not None:
+                    label = f"ID:{track_id} {label}"
+                
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 font_scale = 0.6
                 font_thickness = 2
