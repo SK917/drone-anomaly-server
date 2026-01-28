@@ -1,4 +1,3 @@
-import uuid
 import asyncio
 import time
 from typing import Optional, Dict, Any, List
@@ -8,9 +7,9 @@ import torch
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from aiortc import RTCPeerConnection, RTCSessionDescription
-from aiortc.contrib.media import MediaRelay
-from aiortc.sdp import candidate_from_sdp
+import aiortc
+import aiortc.contrib.media
+import aiortc.sdp
 from ultralytics import YOLO
 import uvicorn
 
@@ -18,12 +17,13 @@ import uvicorn
 HOST = "0.0.0.0"
 PORT = 8000
 
-MODEL_PATH = "yolo11s.pt"      # YOLOv11 Small
+MODEL_PATH = "yolo11s.pt"
 CONFIDENCE = 0.35
-IMG_SIZE = 480                # Smaller = faster inference
-USE_FP16 = True                # Enable half precision for 2x GPU speedup
+IMG_SIZE = 480
 
-# Anomaly detection - classes that trigger warnings
+USE_FP16 = True # Enable Half Precision
+
+# Define logic anomaly cases
 ANOMALY_CLASSES = ["bear", "cow"]
 
 # Global State
@@ -41,8 +41,8 @@ app.add_middleware(
 )
 
 # WebRTC state
-pcs = {}
-relay = MediaRelay()
+pc: Optional[aiortc.RTCPeerConnection] = None
+relay = aiortc.contrib.media.MediaRelay()
 ingest_video_track = None
 
 # YOLO model
@@ -58,17 +58,15 @@ inference_count: int = 0
 inference_start_time: Optional[float] = None
 last_inference_time: float = 0.0
 inference_fps: float = 0.0
-is_inferencing: bool = False  # Flag to prevent concurrent inference
+is_inferencing: bool = False
 
 # Annotated frame state
 latest_raw_frame: Optional[np.ndarray] = None
 latest_annotated_jpeg: Optional[bytes] = None
 annotated_frame_lock = asyncio.Lock()
-frame_dimensions: tuple[int, int] = (0, 0)  # (width, height)
 
-# YOLO Interference
+# YOLO Inference
 def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], float]:
-    """Runs YOLO inference. Returns (detections, inference_ms)."""
     t0 = time.time()
     results = model(
         frame_bgr, 
@@ -79,7 +77,7 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
         half=USE_FP16,
         agnostic_nms=True
     )
-    ms = (time.time() - t0) * 1000.0
+    infms = (time.time() - t0) * 1000.0
 
     dets: List[Dict[str, Any]] = []
     for r in results:
@@ -96,9 +94,10 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
                 "bbox": [x1, y1, x2, y2],
                 "is_anomaly": class_name.lower() in [ac.lower() for ac in ANOMALY_CLASSES]
             })
-    return dets, ms
+    
+    return dets, infms
 
-# Interference Worker
+# Inference Worker
 async def inference_worker():
     """
     Continuously pull frames from WebRTC and run inference.
@@ -124,34 +123,28 @@ async def inference_worker():
         is_inferencing = True
         
         try:
-            # Drain buffer to get ONLY the latest frame (drop all buffered frames)
             latest_frame = None
             frames_drained = 0
             
-            # Keep reading frames until we hit timeout (no more frames in buffer)
             while True:
                 try:
                     frame = await asyncio.wait_for(ingest_video_track.recv(), timeout=0.001)
                     latest_frame = frame
                     frames_drained += 1
                 except asyncio.TimeoutError:
-                    break  # No more frames in buffer
+                    break
             
             if latest_frame is None:
-                # No frames available, try again
                 is_inferencing = False
                 continue
             
             if frames_drained > 1:
-                print(f"[BUFFER] Drained {frames_drained} frames, processing latest only")
+                print(f"[BUFFER] Drained {frames_drained} frames")
             
-            # Decode only the latest frame
             img = latest_frame.to_ndarray(format="bgr24")
             
-            # Run inference
             dets, infer_ms = await asyncio.to_thread(_run_yolo_on_frame, img)
             
-            # Update metrics
             inference_count += 1
             current_time = time.time()
             
@@ -169,15 +162,13 @@ async def inference_worker():
             global latest_raw_frame
             async with annotated_frame_lock:
                 latest_raw_frame = img.copy()
-                frame_dimensions = (img.shape[1], img.shape[0])
             
             # Log results
             anomalies = [d for d in dets if d.get('is_anomaly', False)]
             if dets:
                 print(f"\n[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - Found {len(dets)} object(s) ({infer_ms:.1f}ms):")
                 for i, d in enumerate(dets, 1):
-                    anomaly_marker = "!" if d.get('is_anomaly', False) else ""
-                    print(f"  {i}. {d['class_name']} ({d['confidence']*100:.1f}%){anomaly_marker}")
+                    print(f"  {i}. {d['class_name']} ({d['confidence']*100:.1f}%)")
             else:
                 print(f"[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - No objects detected ({infer_ms:.1f}ms)")
             
@@ -185,21 +176,20 @@ async def inference_worker():
                 print(f"ANOMALY: {', '.join([a['class_name'] for a in anomalies])}")
         
         except asyncio.TimeoutError:
-            print("[INFERENCE] ! Timeout waiting for frame")
+            print("[INFERENCE] Timeout waiting for frame")
         except Exception as e:
-            print(f"[INFERENCE] ! Error: {type(e).__name__}: {str(e)[:100]}")
+            print(f"[INFERENCE] Error: {type(e).__name__}: {str(e)[:100]}")
         finally:
             is_inferencing = False
 
 # Annotation Worker - Draws bounding boxes
 async def annotation_worker():
-    """Background worker that draws bounding boxes on frames."""
     global latest_annotated_jpeg
     
     print("[ANNOTATION] Worker started - waiting for frames...")
     
     while True:
-        await asyncio.sleep(0.05)  # Annotate at ~20 FPS
+        await asyncio.sleep(0.05) # ~20 FPS
         
         # Get current frame and detections
         async with annotated_frame_lock:
@@ -212,7 +202,6 @@ async def annotation_worker():
             continue
         
         try:
-            # Draw on a copy (even if no detections, we still serve the frame)
             annotated = frame.copy()
             
             # Draw each detection
@@ -227,41 +216,126 @@ async def annotation_worker():
                 # Draw bounding box
                 cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
                 
-                # Draw label background
+                # Label
                 label = f"{det['class_name']} {det['confidence']*100:.1f}%"
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 font_scale = 0.6
                 font_thickness = 2
                 (label_w, label_h), baseline = cv2.getTextSize(label, font, font_scale, font_thickness)
-                
-                # Draw filled rectangle for text background
                 cv2.rectangle(annotated, (x1, y1 - label_h - 10), (x1 + label_w, y1), color, -1)
-                
-                # Draw text
                 cv2.putText(annotated, label, (x1, y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
-            
-            # Always encode to JPEG (even if no detections)
+
+            # Encode to JPEG
             ret, buffer = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
             if ret:
                 async with annotated_frame_lock:
                     latest_annotated_jpeg = buffer.tobytes()
-                # Log first successful annotation
-                if inference_count == 1 and len(dets) == 0:
-                    print("[ANNOTATION] ✓ First frame encoded (no detections yet)")
-                elif inference_count == 1:
-                    print(f"[ANNOTATION] ✓ First frame encoded with {len(dets)} detection(s)")
             else:
-                print("[ANNOTATION] ⚠ Failed to encode JPEG")
+                print("[ANNOTATION] Failed to encode JPEG")
         
         except Exception as e:
-            print(f"[ANNOTATION] ⚠ Error: {type(e).__name__}: {str(e)}")
-        except Exception as e:
-            print(f"[ANNOTATION] ⚠ Error: {type(e).__name__}: {str(e)[:100]}")
+            print(f"[ANNOTATION] Error: {type(e).__name__}: {str(e)}")
 
-# API Endpoints
+# Server Startup / Shutdown Process
+@app.on_event("startup")
+async def startup():
+    global model, device
+    
+    print("[STARTUP] Pure Inference Server starting...")
+    
+    # Setup GPU
+    if torch.cuda.is_available():
+        device = "cuda"
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.enabled = True
+        print(f"[GPU] Detected: {torch.cuda.get_device_name(0)}")
+        print(f"[GPU] Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+    else:
+        device = "cpu"
+        print("[WARNING] CUDA not available, using CPU")
+    
+    torch.set_grad_enabled(False)
+    
+    # Load YOLO model
+    print(f"[MODEL] Loading {MODEL_PATH}...")
+    model = await asyncio.to_thread(YOLO, MODEL_PATH)
+    await asyncio.to_thread(model.to, device)
+    
+    # GPU warmup
+    if device == "cuda":
+        print("[MODEL] Warming up GPU...")
+        dummy_frame = np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
+        for _ in range(3):
+            _ = model(dummy_frame, imgsz=IMG_SIZE, device=device, verbose=False, half=USE_FP16)
+        torch.cuda.synchronize()
+    
+    print(f"Model loaded on {device.upper()} with FP16={USE_FP16}")
+    
+    asyncio.create_task(inference_worker())
+    asyncio.create_task(annotation_worker())
+    
+    print(f"Server ready: http://localhost:{PORT}")
+    print(f"Detection Stats: http://localhost:{PORT}/")
+    print(f"Live Video View: http://localhost:{PORT}/video-view")
+    print(f"WHIP endpoint: http://localhost:{PORT}/whip")
+    print(f"Ready to receive WebRTC stream from OBS")
+
+@app.on_event("shutdown")
+async def shutdown():
+    global pc
+    print("[SHUTDOWN] Closing peer connection...")
+    if pc:
+        await pc.close()
+
+# Endpoint for OBS to stream to
+# Establish connection via WHIP (WebRTC-HTTP Ingestion Protocol)
+@app.post("/whip")
+async def whip(request: Request):
+    global ingest_video_track, pc
+
+    pc = aiortc.RTCPeerConnection()
+
+    # Receive the video track from OBS
+    @pc.on("track")
+    def on_track(track):
+        global ingest_video_track
+        print(f"[WHIP] Track received: {track.kind}")
+        if track.kind == "video":
+            ingest_video_track = relay.subscribe(track)
+            print("[WHIP] Video track connected - inference will begin")
+
+    @pc.on("connectionstatechange")
+    async def on_connectionstatechange():
+        print(f"[WHIP] Connection state: {pc.connectionState}")
+        if pc.connectionState == "failed" or pc.connectionState == "closed":
+            await pc.close()
+
+    # WEBRTC Handshake via WHIP
+    offer = aiortc.RTCSessionDescription(sdp=(await request.body()).decode(),type="offer")
+
+    await pc.setRemoteDescription(offer)
+    answer = await pc.createAnswer()
+    await pc.setLocalDescription(answer)
+
+    return Response(pc.localDescription.sdp,status_code=201,media_type="application/sdp",headers={"Location": "/whip/obs"}
+    )
+
+@app.patch("/whip/obs")
+async def whip_trickle(request: Request):
+    if not pc:
+        raise HTTPException(status_code=404)
+
+    sdpfragement = (await request.body()).decode()
+    for line in sdpfragement.splitlines():
+        if line.startswith("a=candidate:"):
+            cand = aiortc.sdp.candidate_from_sdp(line[2:])
+            await pc.addIceCandidate(cand)
+
+    return Response(status_code=204)
+
+# Endpoint for detection information
 @app.get("/detections")
 async def get_detections():
-    """Get current detections."""
     async with detections_lock:
         anomalies = [d for d in current_detections if d.get('is_anomaly', False)]
         return {
@@ -274,9 +348,9 @@ async def get_detections():
             "anomaly_count": len(anomalies)
         }
 
+# Basic stats on inference performance
 @app.get("/stats")
 async def get_stats():
-    """Get performance statistics."""
     return {
         "inference_count": inference_count,
         "inference_fps": round(inference_fps, 2),
@@ -286,17 +360,15 @@ async def get_stats():
 
 @app.get("/annotated-frame.jpg")
 async def get_annotated_frame():
-    """Get the latest frame with bounding boxes drawn."""
     async with annotated_frame_lock:
         if latest_annotated_jpeg is None:
             raise HTTPException(status_code=404, detail="No annotated frame available yet")
-        jpeg = latest_annotated_jpeg
+        updated_jpeg = latest_annotated_jpeg
     
-    return Response(content=jpeg, media_type="image/jpeg")
+    return Response(content=updated_jpeg, media_type="image/jpeg")
 
 @app.get("/video-view")
 async def video_view():
-    """HTML page for viewing annotated video stream."""
     return HTMLResponse(content=f"""
 <!DOCTYPE html>
 <html>
@@ -464,65 +536,6 @@ async def video_view():
   </body>
 </html>
     """)
-
-# WEBRTC Endpoints (WHIP Protocol)
-@app.post("/whip")
-async def whip(request: Request):
-    """Accept WebRTC offer from OBS via WHIP protocol."""
-    global ingest_video_track
-
-    pc = RTCPeerConnection()
-    sid = str(uuid.uuid4())
-    pcs[sid] = pc
-
-    @pc.on("track")
-    def on_track(track):
-        global ingest_video_track
-        print(f"[WHIP] Track received: {track.kind}")
-        if track.kind == "video":
-            ingest_video_track = relay.subscribe(track)
-            print("[WHIP] ✓ Video track connected - inference will begin")
-
-    @pc.on("connectionstatechange")
-    async def on_connectionstatechange():
-        print(f"[WHIP] Connection state: {pc.connectionState}")
-        if pc.connectionState == "failed" or pc.connectionState == "closed":
-            await pc.close()
-            if sid in pcs:
-                del pcs[sid]
-
-    # WHIP protocol: body is raw SDP, not JSON
-    offer = RTCSessionDescription(
-        sdp=(await request.body()).decode(),
-        type="offer"
-    )
-
-    await pc.setRemoteDescription(offer)
-    answer = await pc.createAnswer()
-    await pc.setLocalDescription(answer)
-
-    # WHIP protocol: return SDP as text, not JSON
-    return Response(
-        pc.localDescription.sdp,
-        status_code=201,
-        media_type="application/sdp",
-        headers={"Location": f"/whip/{sid}"}
-    )
-
-@app.patch("/whip/{sid}")
-async def whip_trickle(sid: str, request: Request):
-    """Handle ICE trickle candidates via WHIP."""
-    pc = pcs.get(sid)
-    if not pc:
-        raise HTTPException(status_code=404)
-
-    frag = (await request.body()).decode()
-    for line in frag.splitlines():
-        if line.startswith("a=candidate:"):
-            cand = candidate_from_sdp(line[2:])
-            await pc.addIceCandidate(cand)
-
-    return Response(status_code=204)
 
 # HTML Viewer
 @app.get("/")
@@ -775,58 +788,5 @@ def index():
 </html>
     """)
 
-# Server Startup / Shutdown Process
-@app.on_event("startup")
-async def startup():
-    global model, device
-    
-    print("[STARTUP] Pure Inference Server starting...")
-    
-    # Setup GPU
-    if torch.cuda.is_available():
-        device = "cuda"
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.enabled = True
-        print(f"[GPU] Detected: {{torch.cuda.get_device_name(0)}}")
-        print(f"[GPU] Memory: {{torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}} GB")
-    else:
-        device = "cpu"
-        print("[WARNING] CUDA not available, using CPU")
-    
-    torch.set_grad_enabled(False)
-    
-    # Load YOLO model
-    print(f"[MODEL] Loading {{MODEL_PATH}}...")
-    model = await asyncio.to_thread(YOLO, MODEL_PATH)
-    await asyncio.to_thread(model.to, device)
-    
-    # GPU warmup
-    if device == "cuda":
-        print("[MODEL] Warming up GPU...")
-        dummy_frame = np.zeros((IMG_SIZE, IMG_SIZE, 3), dtype=np.uint8)
-        for _ in range(3):
-            _ = model(dummy_frame, imgsz=IMG_SIZE, device=device, verbose=False, half=USE_FP16)
-        torch.cuda.synchronize()
-    
-    print(f"✓ Model loaded on {{device.upper()}} with FP16={{USE_FP16}}")
-    
-    # Start workers
-    asyncio.create_task(inference_worker())
-    asyncio.create_task(annotation_worker())
-    
-    print(f"✓ Server ready: http://localhost:{{PORT}}")
-    print(f"✓ Detection Stats: http://localhost:{{PORT}}/")
-    print(f"✓ Live Video View: http://localhost:{{PORT}}/video-view")
-    print(f"✓ WHIP endpoint: http://localhost:{{PORT}}/whip")
-    print(f"✓ Ready to receive WebRTC stream from OBS")
-
-@app.on_event("shutdown")
-async def shutdown():
-    print("[SHUTDOWN] Closing all peer connections...")
-    for pc in pcs.values():
-        await pc.close()
-    pcs.clear()
-
-# Run
 if __name__ == "__main__":
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")
