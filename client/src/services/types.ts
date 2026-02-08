@@ -3,6 +3,7 @@ export interface Detection {
     class_name: string
     confidence: number
     bbox: [number, number, number, number]
+    track_id: number | null
     is_anomaly: boolean
 }
 
@@ -17,8 +18,8 @@ export interface DetectionsResponse {
 }
 
 export interface StatsResponse {
-    interference_count: number
-    interference_fps: number
+    inference_count: number
+    inference_fps: number
     has_stream: boolean
     is_processing: boolean
 }

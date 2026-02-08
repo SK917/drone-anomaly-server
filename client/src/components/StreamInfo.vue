@@ -25,7 +25,7 @@
         />
         <StreamInfoBox
             :num="detectionsStore.inference_count ?? 0";
-            label="Interferences"
+            label="Inferences"
             :iconSelect="4"
         />
     </div>
