@@ -64,6 +64,21 @@ export const useDetectionsStore = defineStore("detections", () => {
     }
 
     const groupedDetections = computed(() => Object.values(detectionCounts.value));
+    const groupedDetectionsSorted = computed(() => {
+        return [...groupedDetections.value].sort((a, b) => {
+            const aAnomaly = a.detection.is_anomaly ? 1 : 0;
+            const bAnomaly = b.detection.is_anomaly ? 1 : 0;
+
+            // anomalies first
+            return bAnomaly - aAnomaly;
+        });
+    });
+
+    const groupedAnomalies = computed(() =>
+        groupedDetections.value.filter(
+            entry => entry.detection.is_anomaly
+        )
+    );
 
     //Compute values here for easy imports - can remove later if unneeded.
     const detections = computed<Detection[]>(() => data.value?.detections ?? []);
@@ -84,6 +99,8 @@ export const useDetectionsStore = defineStore("detections", () => {
         stopPolling,
         detectionCounts,
         groupedDetections,
+        groupedDetectionsSorted,
+        groupedAnomalies,
         detections,
         anomalies,
         num_detections,

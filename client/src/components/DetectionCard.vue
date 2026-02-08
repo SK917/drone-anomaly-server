@@ -14,7 +14,7 @@
 </script>
 
 <template>
-    <div v-if="detect.is_anomaly" class="m-4 h-25 bg-gray-900 rounded-t-sm flex flex-col justify-between">
+    <div v-if="detect.is_anomaly" class="m-4 h-25 bg-gray-900 rounded-sm flex flex-col justify-between border border-transparent hover:border-red-500">
         <div class="p-2 pt-3 flex flex-row items-center justify-between gap-2">
             <div class="flex flex-row items-center gap-2">
                 <TriangleAlert :size="35" class="pr-1 text-red-500" />
@@ -38,7 +38,7 @@
             </div>
         </div>
     </div>
-    <div v-else class="m-4 h-25 bg-gray-900 rounded-t-sm flex flex-col justify-between">
+    <div v-else class="m-4 h-25 bg-gray-900 rounded-sm flex flex-col justify-between border border-transparent hover:border-lime-500">
         <div class="p-2 pt-3 flex flex-row items-center justify-between gap-2">
             <div class="flex flex-row items-center gap-2">
                 <Crosshair :size="35" class="pr-1 text-lime-500" />

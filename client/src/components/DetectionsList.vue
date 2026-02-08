@@ -9,10 +9,15 @@
     const detectionsStore = useDetectionsStore();
 
     const showAnalytics = ref(false);
+    const anomaliesOnly = ref(false);
 
     const toggleAnalytics = () => {
         showAnalytics.value = !showAnalytics.value;
     };
+
+    const toggleAnomalies = () => {
+        anomaliesOnly.value = !anomaliesOnly.value;
+    }
 
 </script>
 
@@ -30,24 +35,40 @@
                 </div>
                 <DetectionCard
                 v-else
-                v-for="item in detectionsStore.groupedDetections"
+                v-for="item in (
+                    anomaliesOnly
+                    ? detectionsStore.groupedAnomalies
+                    : detectionsStore.groupedDetectionsSorted
+                )"
                 :key="item.detection.class_id"
                 :detect="item.detection"
                 :numDetects="item.numDetects"
                 />
             </div>
-            
         </div>
-        <div class="mr-4 mb-4">
-            <button 
-                @click="toggleAnalytics"
-                class="flex flex-row gap-3 items-center cursor-pointer bg-gray-800 rounded-sm p-2 text-gray-400 border border-transparent
-                hover:border-yellow-600 hover:text-white"
-            >
-                <RefreshCw :size=20 class="text-amber-200"/>
-                {{ showAnalytics ? 'Show Detections' : 'Show Analytics'}}
-            </button>
+        <div class="flex flex-row w-full" >
+            <div v-if="!showAnalytics" class="mr-4 ml-4 mb-4">
+                <button 
+                    @click="toggleAnomalies"
+                    class="flex flex-row gap-3 items-center cursor-pointer bg-gray-800 rounded-sm p-2 text-gray-400 border border-transparent
+                    hover:border-yellow-600 hover:text-white"
+                >
+                    <RefreshCw :size=20 class="text-amber-200"/>
+                    {{ anomaliesOnly ? 'Show All Detections' : 'Show Anomalies Only'}}
+                </button>
+            </div>
+            <div class="mr-4 mb-4 ml-auto">
+                <button 
+                    @click="toggleAnalytics"
+                    class="flex flex-row gap-3 items-center cursor-pointer bg-gray-800 rounded-sm p-2 text-gray-400 border border-transparent
+                    hover:border-yellow-600 hover:text-white"
+                >
+                    <RefreshCw :size=20 class="text-amber-200"/>
+                    {{ showAnalytics ? 'Show Detections' : 'Show Analytics'}}
+                </button>
+            </div>
         </div>
+        
     </div>
     
 </template>
