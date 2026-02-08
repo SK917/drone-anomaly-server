@@ -23,3 +23,10 @@ export interface StatsResponse {
     has_stream: boolean
     is_processing: boolean
 }
+
+export interface FrequencyItem {
+    class_id: number;
+    class_name: string;
+    count: number;
+    frequency: number;
+}
