@@ -30,7 +30,7 @@
                 </div>
             </div>
             <div v-else>
-                <div v-if="detectionsStore.detections.length===0" class="w-full h-full flex items-center justify-center text-gray-400 text-lg">
+                <div v-if="detectionsStore.groupedDetectionsSorted.length===0" class="w-full h-full flex items-center justify-center text-gray-400 text-lg">
                     No detections.
                 </div>
                 <DetectionCard

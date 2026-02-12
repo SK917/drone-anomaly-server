@@ -17,14 +17,16 @@ import uvicorn
 HOST = "0.0.0.0"
 PORT = 8000
 
-MODEL_PATH = "yolo11s.pt"
-CONFIDENCE = 0.35
+# MODEL_PATH = "yolo11s.pt"
+MODEL_PATH = "noMarkingsDodo.pt"
+CONFIDENCE = 0.5
 IMG_SIZE = 480
 
 USE_FP16 = True # Enable Half Precision
 
 # Define logic anomaly cases
-ANOMALY_CLASSES = ["bear", "cow"]
+# ANOMALY_CLASSES = ["bear", "cow"]
+ANOMALY_CLASSES = ["pig", "fire", "wolf", "deer"]
 
 # Global State
 app = FastAPI()
