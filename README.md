@@ -10,6 +10,7 @@ This project requires the following:
 - Python 3.12+
 - Node.js 24.13.0+
 - OBS
+- Vue Extension for VS Code
 
 If you do not have the required dependencies, follow the steps below, otherwise skip to [First Setup](#first-setup).
 
@@ -30,6 +31,9 @@ The frontend uses Vue.js as its framework, which requires npm (and Node.js) to r
 
  #### 3. OBS Installation
  Similar to Python, OBS has an installer found on its website [here](https://cdn-fastly.obsproject.com/downloads/OBS-Studio-32.0.4-Windows-x64-Installer.exe) (this initiates the download of the latest installer for Windows). Follow the steps on the installer to complete the process. 
+
+ #### 4. Vue Extension Installation
+ Go to the extension panel on VS Code and look for `Vue (Official)`. The publisher is vue.js.org. Alternatively, you can find the link to the extension [here](https://marketplace.visualstudio.com/items?itemName=Vue.volar). Click install, and you should be good to go. This extension is required for TypeScript to recognize the .vue files in the project.
 
 ### First Setup
 1. Clone the repository to your intended directory:
