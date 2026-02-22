@@ -3,7 +3,7 @@
 </script>
 
 <template>
-    <footer class="bg-slate-500 p-4 text-xs text-gray-200 flex justify-between items-center">
+    <footer class="bg-gray-950 p-4 text-xs text-gray-200 flex justify-between items-center font-orbit border-t border-t-yellow-600">
         <div>
             NG-06 TMU Engineering Capstone
         </div>

@@ -14,33 +14,32 @@ export const useAnalyticsStore = defineStore("analytics", () => {
 
     const objectCounts = ref<Record<number, number>>({});
     const anomalyCounts = ref<Record<number, number>>({});
-
-    // Cache class metadata
     const classInfo = ref<Record<number, { class_name: string }>>({});
+    const seenTrackingIds = ref<Set<number>>(new Set());
 
     function processDetections(detections: Detection[]) {
         detections.forEach((det) => {
+            if (det.track_id === null) return;
+            if (seenTrackingIds.value.has(det.track_id)) return;
+            seenTrackingIds.value.add(det.track_id);
+
             totalDetections.value++;
             totalConfidence.value += det.confidence;
 
-            // Cache class metadata once
             if (!classInfo.value[det.class_id]) {
                 classInfo.value[det.class_id] = {
                     class_name: det.class_name,
                 };
             }
 
-            // Max confidence
             if (!maxDetection.value || det.confidence > maxDetection.value.confidence) {
                 maxDetection.value = det;
             }
 
-            // Min confidence
             if (!minDetection.value || det.confidence < minDetection.value.confidence) {
                 minDetection.value = det;
             }
 
-            // Update frequency counts
             if (det.is_anomaly) {
                 anomalyCounts.value[det.class_id] =
                     (anomalyCounts.value[det.class_id] ?? 0) + 1;
@@ -58,14 +57,23 @@ export const useAnalyticsStore = defineStore("analytics", () => {
         }
     }
 
-    // Average confidence
+    function resetAnalytics() {
+        totalDetections.value = 0;
+        totalConfidence.value = 0;
+        maxDetection.value = null;
+        minDetection.value = null;
+        objectCounts.value = {};
+        anomalyCounts.value = {};
+        classInfo.value = {};
+        seenTrackingIds.value.clear();
+    }
+
     const averageConfidence = computed(() =>
         totalDetections.value === 0
             ? 0
             : totalConfidence.value / totalDetections.value
     );
 
-    // Object / anomaly counts
     const totalObjects = computed(() =>
         Object.values(objectCounts.value).reduce((a, b) => a + b, 0)
     );
@@ -74,20 +82,18 @@ export const useAnalyticsStore = defineStore("analytics", () => {
         Object.values(anomalyCounts.value).reduce((a, b) => a + b, 0)
     );
 
-    // Object / anomaly distributions
-    const totalObjectDistribution = computed(() => 
+    const totalObjectDistribution = computed(() =>
         totalDetections.value === 0
             ? 0
             : totalObjects.value / totalDetections.value
     );
 
-    const totalAnomalyDistribution = computed(() => 
+    const totalAnomalyDistribution = computed(() =>
         totalDetections.value === 0
             ? 0
             : totalAnomalies.value / totalDetections.value
     );
 
-    // Frequency builder helper function
     function buildFrequencyList(
         counts: Record<number, number>,
         divisor: number
@@ -102,7 +108,6 @@ export const useAnalyticsStore = defineStore("analytics", () => {
         }));
     }
 
-    // Frequencies
     const objectFrequencyByObjects = computed<FrequencyItem[]>(() =>
         buildFrequencyList(objectCounts.value, totalObjects.value)
     );
@@ -119,8 +124,36 @@ export const useAnalyticsStore = defineStore("analytics", () => {
         buildFrequencyList(anomalyCounts.value, totalDetections.value)
     );
 
+    function getFrequencyFromList(list: FrequencyItem[], classId: number): number {
+        const item = list.find(item => item.class_id === classId)
+        if (!item) return 0
+        return Number((item.frequency * 100).toFixed(2))
+    }
+
+    function getFrequenciesForClass(classId: number) {
+        return {
+            objectByObjects: getFrequencyFromList(
+                objectFrequencyByObjects.value,
+                classId
+            ),
+            objectByDetections: getFrequencyFromList(
+                objectFrequencyByDetections.value,
+                classId
+            ),
+            anomalyByAnomalies: getFrequencyFromList(
+                anomalyFrequencyByAnomalies.value,
+                classId
+            ),
+            anomalyByDetections: getFrequencyFromList(
+                anomalyFrequencyByDetections.value,
+                classId
+            ),
+        };
+    }
+
     return {
         updateDetections,
+        resetAnalytics,
         totalDetections,
         totalObjects,
         totalAnomalies,
@@ -133,5 +166,7 @@ export const useAnalyticsStore = defineStore("analytics", () => {
         anomalyFrequencyByAnomalies,
         objectFrequencyByDetections,
         anomalyFrequencyByDetections,
+        getFrequencyFromList,
+        getFrequenciesForClass,
     };
 });

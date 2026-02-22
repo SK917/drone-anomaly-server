@@ -1,31 +1,23 @@
 <script setup lang="ts">
-    import type { Detection } from '@/services/types';
     import { useAnalyticsStore } from '@/stores/analytics-store';
     import AnalyticsCard from './AnalyticsCard.vue';
-    import AnalyticsHeader from './AnalyticsHeader.vue';
-    import FrequencyList from './FrequencyList.vue';
 
     const analyticsStore = useAnalyticsStore();
-
 </script>
 
 <template>
-    <div class="flex flex-col">
-        <AnalyticsHeader
-        label="Confidence"
-        :isFirst="true"
-        :isSubHeader="false"
-        />
-        <div class="flex flex-row items-center gap-2">
-            <div class="w-full">
+    <div class="flex flex-row gap-2 items-baseline bg-slate-950 rounded-sm overflow-x-auto flex-nowrap w-full p-2 detections-scroll">
+            
+            <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.minDetection?.confidence ?? 0"
-                :label="'Min Confidence'"
-                :otherInfo="'Tracking ID: ' + analyticsStore.minDetection?.track_id"
+                :label="'Lowest Confidence'"
+                :otherInfo="'ID: ' + (analyticsStore.minDetection?.track_id ?? 'N/A')"
                 :isPercent="true"
                 />
             </div>
-            <div class="w-full">
+
+            <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.averageConfidence"
                 :label="'Average Confidence'"
@@ -33,23 +25,17 @@
                 :isPercent="true"
                 />
             </div>
-            <div class="w-full">
+
+            <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.maxDetection?.confidence ?? 0"
-                :label="'Max Confidence'"
-                :otherInfo="'Tracking ID: ' + analyticsStore.maxDetection?.track_id"
+                :label="'Highest Confidence'"
+                :otherInfo="'ID: ' + (analyticsStore.maxDetection?.track_id ?? 'N/A')"
                 :isPercent="true"
                 />
             </div>
-        </div>
 
-        <AnalyticsHeader
-        label="Detection Counts"
-        :isFirst="false"
-        :isSubHeader="false"
-        />
-        <div class="flex flex-row items-center gap-2">
-            <div class="w-full">
+            <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.totalObjects"
                 :label="'Total Objects'"
@@ -57,7 +43,8 @@
                 :isPercent="false"
                 />
             </div>
-            <div class="w-full">
+
+            <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.totalDetections"
                 :label="'Total Detections'"
@@ -65,7 +52,8 @@
                 :isPercent="false"
                 />
             </div>
-            <div class="w-full">
+
+            <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.totalAnomalies"
                 :label="'Total Anomalies'"
@@ -73,62 +61,23 @@
                 :isPercent="false"
                 />
             </div>
-        </div>
-        <div class="flex flex-row items-center gap-2">
-            <div class="w-full">
+
+            <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.totalObjectDistribution"
-                :label="'Objects'"
-                :otherInfo="'of all detections are'"
+                :label="'are Objects'"
+                :otherInfo="'of all detections'"
                 :isPercent="true"
                 />
             </div>
-            <div class="w-full">
+
+            <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.totalAnomalyDistribution"
-                :label="'Anomalies'"
-                :otherInfo="'of all detections are'"
+                :label="'are Anomalies'"
+                :otherInfo="'of all detections'"
                 :isPercent="true"
                 />
             </div>
-        </div>
-
-        <AnalyticsHeader
-        label="Frequency Counts"
-        :isFirst="false"
-        :isSubHeader="false"
-        />
-        <AnalyticsHeader
-        label="Anomaly Distribution Across All Anomalies"
-        :isFirst="false"
-        :isSubHeader="true"
-        />
-        <FrequencyList
-        :items="analyticsStore.anomalyFrequencyByAnomalies"
-        />
-        <AnalyticsHeader
-        label="Anomaly Distribution Across All Detections"
-        :isFirst="false"
-        :isSubHeader="true"
-        />
-        <FrequencyList
-        :items="analyticsStore.anomalyFrequencyByDetections"
-        />
-        <AnalyticsHeader
-        label="Object Distribution Across All Objects"
-        :isFirst="false"
-        :isSubHeader="true"
-        />
-        <FrequencyList
-        :items="analyticsStore.objectFrequencyByObjects"
-        />
-        <AnalyticsHeader
-        label="Object Distribution Across All Detections"
-        :isFirst="false"
-        :isSubHeader="true"
-        />
-        <FrequencyList
-        :items="analyticsStore.objectFrequencyByDetections"
-        />
     </div>
 </template>

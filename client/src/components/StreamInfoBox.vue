@@ -11,25 +11,25 @@
 </script>
 
 <template>
-    <div class="p-4 w-xl flex items-end gap-3">
+    <div class="p-2 flex items-end gap-2">
         <div class="flex items-center gap-2">
             <div v-if="iconSelect===1">
-                <Crosshair :size="40" class="pr-1 text-amber-200" />
+                <Crosshair :size="20" class="pr-1 text-lime-400" />
             </div>
             <div v-else-if="iconSelect===2">
-                <TriangleAlert :size="40" class="pr-1 text-amber-200" />
+                <TriangleAlert :size="20" class="pr-1 text-red-400" />
             </div>
             <div v-else-if="iconSelect===3">
-                <Gauge :size="40" class="pr-1 text-amber-200" />
+                <Gauge :size="20" class="pr-1 text-amber-200" />
             </div>
             <div v-else-if="iconSelect===4">
-                <Activity :size="40" class="pr-1 text-amber-200" />
+                <Activity :size="20" class="pr-1 text-amber-200" />
             </div>
-            <div class="text-gray-200 text-4xl">
+            <div class="text-gray-200 text-2xl font-tektur">
                 {{ num }}
             </div>
         </div>
-        <div class="text-gray-400 text-sm">
+        <div class="text-gray-400 text-xs font-orbit">
             {{ label }}
         </div>
     </div>

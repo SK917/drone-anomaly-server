@@ -3,17 +3,10 @@
     import { useDetectionsStore } from '@/stores/detections-store';
     import type { Detection, DetectionsResponse } from '@/services/types';
     import DetectionCard from './DetectionCard.vue';
-    import AnalyticsList from './AnalyticsList.vue';
     import { RefreshCw } from 'lucide-vue-next';
 
     const detectionsStore = useDetectionsStore();
-
-    const showAnalytics = ref(false);
     const anomaliesOnly = ref(false);
-
-    const toggleAnalytics = () => {
-        showAnalytics.value = !showAnalytics.value;
-    };
 
     const toggleAnomalies = () => {
         anomaliesOnly.value = !anomaliesOnly.value;
@@ -23,78 +16,38 @@
 
 <template>
     <div class="flex flex-col items-end">
-        <div class="m-4 w-180 h-130 bg-gray-800 rounded-sm p-2 overflow-y-auto detections-scroll">
-            <div v-if="showAnalytics">
-                <div>
-                    <AnalyticsList/>
-                </div>
-            </div>
-            <div v-else>
-                <div v-if="detectionsStore.groupedDetectionsSorted.length===0" class="w-full h-full flex items-center justify-center text-gray-400 text-lg">
-                    No detections.
-                </div>
-                <DetectionCard
-                v-else
-                v-for="item in (
-                    anomaliesOnly
-                    ? detectionsStore.groupedAnomalies
-                    : detectionsStore.groupedDetectionsSorted
-                )"
-                :key="item.detection.class_id"
-                :detect="item.detection"
-                :numDetects="item.numDetects"
-                />
-            </div>
-        </div>
-        <div class="flex flex-row w-full" >
-            <div v-if="!showAnalytics" class="mr-4 ml-4 mb-4">
+        <div class="flex flex-row w-full mt-4" >
+            <div class="mr-4 ml-4 mb-4">
                 <button 
                     @click="toggleAnomalies"
                     class="flex flex-row gap-3 items-center cursor-pointer bg-gray-800 rounded-sm p-2 text-gray-400 border border-transparent
-                    hover:border-yellow-600 hover:text-white"
+                    hover:border-yellow-600 hover:text-white font-orbit text-xs"
                 >
                     <RefreshCw :size=20 class="text-amber-200"/>
                     {{ anomaliesOnly ? 'Show All Detections' : 'Show Anomalies Only'}}
                 </button>
             </div>
-            <div class="mr-4 mb-4 ml-auto">
-                <button 
-                    @click="toggleAnalytics"
-                    class="flex flex-row gap-3 items-center cursor-pointer bg-gray-800 rounded-sm p-2 text-gray-400 border border-transparent
-                    hover:border-yellow-600 hover:text-white"
-                >
-                    <RefreshCw :size=20 class="text-amber-200"/>
-                    {{ showAnalytics ? 'Show Detections' : 'Show Analytics'}}
-                </button>
+        </div>
+        <div class="ml-4 mr-4 w-[calc(100%-2rem)] h-130 bg-gray-800 rounded-sm p-2 overflow-y-auto detections-scroll">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1 content-start">
+                <div v-if="detectionsStore.groupedDetectionsSorted.length===0" 
+                    class="col-span-1 md:col-span-2 lg:col-span-3 h-full flex items-center justify-center text-gray-400 text-lg font-orbit">
+                    No detections.
+                </div>
+                
+                <DetectionCard
+                    v-else
+                    v-for="item in (
+                        anomaliesOnly
+                        ? detectionsStore.groupedAnomalies
+                        : detectionsStore.groupedDetectionsSorted
+                    )"
+                    :key="item.detection.class_id"
+                    :detect="item.detection"
+                    :numDetects="item.numDetects"
+                />
             </div>
         </div>
-        
     </div>
     
 </template>
-
-<style scoped>
-    /* Chrome, Edge, Safari */
-    .detections-scroll::-webkit-scrollbar {
-    width: 8px;
-    }
-
-    .detections-scroll::-webkit-scrollbar-track {
-    background: #1f2937; /* gray-800 */
-    }
-
-    .detections-scroll::-webkit-scrollbar-thumb {
-    background-color: #4b5563; /* gray-600 */
-    border-radius: 6px;
-    }
-
-    .detections-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: #6b7280; /* gray-500 */
-    }
-
-    /* Firefox */
-    .detections-scroll {
-    scrollbar-width: thin;
-    scrollbar-color: #4b5563 #1f2937;
-    }
-</style>

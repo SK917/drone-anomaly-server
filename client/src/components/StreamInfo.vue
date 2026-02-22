@@ -7,7 +7,7 @@
 </script>
 
 <template>
-    <div class="mt-4 flex gap-6 items-center w-full bg-gray-800">
+    <div class="flex gap-1 p-2 items-center bg-gray-800">
         <StreamInfoBox
             :num="detectionsStore.num_detections ?? 0";
             label="Objects Detected"

@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+@theme {
+    --font-orbit: "Orbit";
+    --font-tektur: "Tektur";
+}
+
+/* Custom Scrollbar Utilities */
+@layer utilities {
+  /* Chrome, Edge, Safari */
+  .detections-scroll::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+
+  .detections-scroll::-webkit-scrollbar-track {
+    background: #111827; /* slate-900 */
+    border-radius: 10px;
+  }
+
+  .detections-scroll::-webkit-scrollbar-thumb {
+    background-color: #4b5563; /* gray-600 */
+    border-radius: 10px;
+  }
+
+  .detections-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: #fbbf24; /* amber-400 */
+  }
+
+  /* Firefox */
+  .detections-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #111827;
+  }
+}
