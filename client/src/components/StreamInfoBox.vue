@@ -11,7 +11,7 @@
 </script>
 
 <template>
-    <div class="p-2 flex items-end gap-2">
+    <div class="p-2 flex items-end gap-2 flex-1">
         <div class="flex items-center gap-2">
             <div v-if="iconSelect===1">
                 <Crosshair :size="20" class="pr-1 text-lime-400" />

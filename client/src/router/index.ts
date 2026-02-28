@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "@/views/Home.vue";
 
-const DEFAULT_TITLE = "Drone Anomaly Sim";
+const DEFAULT_TITLE = "Drone Analytics Dashboard";
 
 const router = createRouter({
     history: createWebHistory(),

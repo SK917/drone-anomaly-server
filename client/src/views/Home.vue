@@ -38,15 +38,17 @@
 </script>
 
 <template>
-    <div class="flex flex-row gap-6 flex-1 min-h-0">
-        <div class="flex flex-col gap-6 basis-[42%] items-center m-4 overflow-y-auto min-w-0">
-            <StreamInfo/>
-            <VideoFeed/>
-            <AnalyticsList/>
-        </div>
-        
-        <div class="bg-slate-950 flex-1 h-full overflow-hidden">
-            <DetectionsList/>
-        </div>
+  <div class="flex flex-col md:flex-row gap-6 md:h-screen md:overflow-hidden bg-slate-900">
+    
+    <div class="flex flex-col gap-6 w-full md:basis-[42%] items-center p-4 min-w-0 md:overflow-y-auto detections-scroll">
+      <StreamInfo/>
+      <VideoFeed/>
+      <AnalyticsList/>
     </div>
+    
+    <div class="bg-slate-950 flex-1 h-auto md:h-full min-h-[500px]">
+      <DetectionsList/>
+    </div>
+
+  </div>
 </template>

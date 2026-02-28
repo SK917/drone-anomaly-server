@@ -7,7 +7,7 @@
 </script>
 
 <template>
-    <div class="flex gap-1 p-2 items-center bg-gray-800">
+    <div class="flex flex-row flex-nowrap w-full gap-1 p-2 items-center bg-gray-800 overflow-x-auto detections-scroll rounded-sm">
         <StreamInfoBox
             :num="detectionsStore.num_detections ?? 0";
             label="Objects Detected"

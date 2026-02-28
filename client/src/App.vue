@@ -8,8 +8,8 @@
     <div class="bg-slate-900 h-screen flex flex-col overflow-hidden">
         <Header />
 
-        <main class="flex-1 flex flex-col min-h-0">
-          <RouterView />
+        <main class="flex-1 flex flex-col min-h-0 overflow-y-auto detections-scroll md:overflow-hidden">
+          <RouterView/>
         </main>
 
         <Footer />

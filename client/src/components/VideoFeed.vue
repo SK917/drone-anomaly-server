@@ -8,7 +8,7 @@
 </script>
 
 <template>
-    <div class="p-0.5 w-160 aspect-video bg-yellow-600 border-20 border-gray-800 outline outline-transparent rounded-sm
+    <div class="p-0.5 w-full max-w-2xl aspect-video bg-gray-800 border-20 border-gray-800 outline outline-transparent rounded-sm
     hover:outline-yellow-600">
         <img
             v-if="statsStore.has_stream && statsStore.has_stream!=null"
