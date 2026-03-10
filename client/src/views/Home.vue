@@ -4,16 +4,19 @@
     import { useStatsStore } from '@/stores/stats-store';
     import { useFramesStore } from '@/stores/frames-store';
     import { useAnalyticsStore } from '@/stores/analytics-store';
+    import { useAnomaliesStore } from '@/stores/anomalies-store';
     import StreamInfo from '@/components/StreamInfo.vue';
     import VideoFeed from '@/components/VideoFeed.vue';
     import DetectionsList from '@/components/DetectionsList.vue';
     import AnalyticsList from '@/components/AnalyticsList.vue';
+    import Search from '@/components/Search.vue';
     import DevInfo from '@/components/DevInfo.vue';
 
     const detectionsStore = useDetectionsStore();
     const statsStore = useStatsStore();
     const framesStore = useFramesStore();
     const analyticsStore = useAnalyticsStore();
+    const anomaliesStore = useAnomaliesStore();
 
     const socket = ref<WebSocket | null>(null);
 
@@ -24,25 +27,36 @@
             console.log("Connected to Drone Inference Server");
         };
 
+        let fetchingAnomalies = false;
+
         socket.value.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            if(data.type === "NEW_FRAME") {
-                //Frame fetch
-                framesStore.getNewFrame();
-            }
-            if (data.type === "NEW_DATA") {
-                // JSON data fetches
-                detectionsStore.fetchDetections();
-                statsStore.fetchStats();
+            switch (data.type) {
+                // Fetch frame
+                case "NEW_FRAME":
+                    framesStore.getNewFrame()
+                    break
+
+                // Fetch detections / stats data
+                case "NEW_DATA":
+                    detectionsStore.fetchDetections()
+                    statsStore.fetchStats()
+                    break
+
+                // Update anomaly list (if check prevents race condition if many anomalies are detected at once)
+                case "NEW_ANOMALY":
+                    if (!fetchingAnomalies) {
+                        fetchingAnomalies = true
+                        anomaliesStore.fetchAnomalies().finally(() => {
+                            fetchingAnomalies = false
+                        })
+                    }
+                    break
             }
         };
 
         socket.value.onerror = (error) => console.error("Socket Error:", error);
         socket.value.onclose = () => console.log("Socket Closed");
-
-        // detectionsStore.startPolling(200);
-        // statsStore.startPolling(200);
-        // framesStore.startPolling(50);
     })
 
     watch(
@@ -57,10 +71,6 @@
         if (socket.value) {
             socket.value.close();
         }
-
-        // detectionsStore.stopPolling();
-        // statsStore.stopPolling();
-        // framesStore.stopPolling();
     })
 
 </script>
@@ -68,14 +78,15 @@
 <template>
   <div class="flex flex-col md:flex-row gap-6 md:h-screen md:overflow-hidden bg-slate-900">
     
-    <div class="flex flex-col gap-6 w-full md:basis-[42%] items-center p-4 min-w-0 md:overflow-y-auto detections-scroll">
-      <StreamInfo/>
-      <VideoFeed/>
-      <AnalyticsList/>
+    <div class="flex flex-col gap-6 md:basis-[42%] shrink-0 p-4 min-w-0 md:overflow-y-auto detections-scroll">
+        <StreamInfo/>
+        <VideoFeed/>
+        <AnalyticsList/>
     </div>
     
-    <div class="bg-slate-950 flex-1 h-auto md:h-full min-h-[500px]">
-      <DetectionsList/>
+    <div class="flex flex-col gap-6 bg-slate-950 flex-1 min-w-0 h-screen max-h-screen overflow-hidden">
+        <DetectionsList class="shrink-0" />
+        <Search class="flex-1 min-h-0" /> 
     </div>
 
   </div>

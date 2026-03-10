@@ -44,6 +44,11 @@ device: str = "cpu"
 current_detections: List[Dict[str, Any]] = []
 detections_lock = asyncio.Lock()
 
+# Anomalies list
+anomalies_list: List[Dict[str, Any]] = []
+seen_anomaly_ids: set[int] = set()
+anomalies_lock = asyncio.Lock()
+
 # Performance metrics
 inference_count: int = 0
 inference_start_time: Optional[float] = None
@@ -71,6 +76,10 @@ class ConnectionManager:
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+        if not self.active_connections:
+            print("[SESSION] Last client disconnected. Clearing anomaly logs.")
+            anomalies_list.clear()
+            seen_anomaly_ids.clear()
 
     async def broadcast(self, message: dict):
         for connection in self.active_connections:
@@ -198,6 +207,45 @@ async def inference_worker():
                 
                 # Log results
                 anomalies = [d for d in detections if d.get('is_anomaly', False)]
+
+                # Update anomalies list, broadcast new entries
+                # Only updates if there are connected clients
+                if manager.active_connections:  
+                    should_broadcast = False
+                    
+                    async with anomalies_lock:
+                        for det in anomalies:
+                            track_id = det.get("track_id")
+                            if track_id is None:
+                                continue
+                            
+                            # Look for an existing record of this specific track
+                            existing_entry = next((a for a in anomalies_list if a["track_id"] == track_id), None)
+
+                            if existing_entry is None:
+                                # New anomaly: Add to list and seen set
+                                seen_anomaly_ids.add(track_id)
+                                new_entry = det.copy()
+                                new_entry["timestamp"] = time.time() # Useful for search cards
+                                anomalies_list.append(new_entry)
+                                should_broadcast = True
+                            
+                            elif det["confidence"] > existing_entry["confidence"]:
+                                # Existing anomaly, but better confidence: Update the record
+                                existing_entry["confidence"] = det["confidence"]
+                                existing_entry["bbox"] = det["bbox"]
+                                should_broadcast = True
+
+                    # Notify the connected clients if something was added OR improved
+                    if should_broadcast:
+                        await manager.broadcast({"type": "NEW_ANOMALY"})
+                else:
+                    # Clear history if no one is watching to keep session fresh
+                    if seen_anomaly_ids:
+                        seen_anomaly_ids.clear()
+                        async with anomalies_lock:
+                            anomalies_list.clear()
+
                 if detections:
                     print(f"\n[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - Found {len(detections)} object(s) ({infer_ms:.1f}ms):")
                     for i, d in enumerate(detections, 1):
@@ -445,6 +493,30 @@ async def get_detections():
             "has_anomaly": len(anomalies) > 0,
             "anomaly_count": len(anomalies)
         }
+    
+# Endpoint for anomaly search data
+@app.get("/anomalies")
+async def get_anomalies():
+    async with anomalies_lock:
+        anomalies_copy = anomalies_list.copy()
+
+    # Build class list for filtering
+    classes = {}
+    for a in anomalies_copy:
+        cid = a["class_id"]
+        cname = a["class_name"]
+
+        if cid not in classes:
+            classes[cid] = {
+                "class_id": cid,
+                "class_name": cname
+            }
+
+    return {
+        "count": len(anomalies_copy),
+        "classes": list(classes.values()),
+        "anomalies": anomalies_copy
+    }
 
 # Basic stats on inference performance
 @app.get("/stats")

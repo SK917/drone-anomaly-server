@@ -21,7 +21,9 @@ export const useAnalyticsStore = defineStore("analytics", () => {
         detections.forEach((det) => {
             if (det.track_id === null) return;
             if (seenTrackingIds.value.has(det.track_id)) return;
-            seenTrackingIds.value.add(det.track_id);
+            const nextSet = new Set(seenTrackingIds.value);
+            nextSet.add(det.track_id);
+            seenTrackingIds.value = nextSet;
 
             totalDetections.value++;
             totalConfidence.value += det.confidence;
@@ -154,6 +156,7 @@ export const useAnalyticsStore = defineStore("analytics", () => {
     return {
         updateDetections,
         resetAnalytics,
+        seenTrackingIds,
         totalDetections,
         totalObjects,
         totalAnomalies,

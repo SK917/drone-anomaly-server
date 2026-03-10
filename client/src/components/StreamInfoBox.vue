@@ -25,7 +25,7 @@
             <div v-else-if="iconSelect===4">
                 <Activity :size="20" class="pr-1 text-amber-200" />
             </div>
-            <div class="text-gray-200 text-2xl font-tektur">
+            <div class="text-gray-200 text-xl font-tektur">
                 {{ num }}
             </div>
         </div>
