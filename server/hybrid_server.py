@@ -7,11 +7,14 @@ import torch
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import WebSocket, WebSocketDisconnect
 import aiortc
 import aiortc.contrib.media
 import aiortc.sdp
 from ultralytics import YOLO
+from contextlib import asynccontextmanager
 import uvicorn
+import logging
 
 # Config
 HOST = "0.0.0.0"
@@ -27,20 +30,6 @@ USE_FP16 = True # Enable Half Precision
 # Define logic anomaly cases
 # ANOMALY_CLASSES = ["bear", "cow"]
 ANOMALY_CLASSES = ["pig", "fire", "wolf", "deer"]
-
-# Global State
-app = FastAPI()
-
-# Allowed Access Points
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", 
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # WebRTC state
 pc: Optional[aiortc.RTCPeerConnection] = None
@@ -66,6 +55,32 @@ is_inferencing: bool = False
 latest_raw_frame: Optional[np.ndarray] = None
 latest_annotated_jpeg: Optional[bytes] = None
 annotated_frame_lock = asyncio.Lock()
+
+# Trigger events
+stop_event = asyncio.Event()
+
+# WebSocket for client updates
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except Exception:
+                # Remove stale connections
+                self.active_connections.remove(connection)
+
+manager = ConnectionManager()
 
 # YOLO Inference with ByteTrack for Tracking
 # Use ultralytics built in tracking support with the bytetrack algorithm for stable fps
@@ -123,141 +138,165 @@ async def inference_worker():
     
     print("[INFERENCE] Worker started - waiting for video stream...")
     
-    while True:
-        await asyncio.sleep(0.001)  # Small sleep to prevent busy-wait
-        
-        # Wait for stream
-        if ingest_video_track is None:
-            await asyncio.sleep(0.1)
-            continue
-        
-        # Skip if already processing (prevents concurrent inference)
-        if is_inferencing:
-            continue
-        
-        is_inferencing = True
-        
-        try:
-            latest_frame = None
-            frames_drained = 0
+    try:
+        while not stop_event.is_set():
+            await asyncio.sleep(0.001)  # Small sleep to prevent busy-wait
             
-            while True:
-                try:
-                    frame = await asyncio.wait_for(ingest_video_track.recv(), timeout=0.001)
-                    latest_frame = frame
-                    frames_drained += 1
-                except asyncio.TimeoutError:
-                    break
-            
-            if latest_frame is None:
-                is_inferencing = False
+            # Wait for stream
+            if ingest_video_track is None:
+                await asyncio.sleep(0.1)
                 continue
             
-            if frames_drained > 1:
-                print(f"[BUFFER] Drained {frames_drained} frames")
+            # Skip if already processing (prevents concurrent inference)
+            if is_inferencing:
+                continue
             
-            img = latest_frame.to_ndarray(format="bgr24")
+            is_inferencing = True
             
-            detections, infer_ms = await asyncio.to_thread(_run_yolo_on_frame, img)
+            try:
+                latest_frame = None
+                frames_drained = 0
+                
+                while True:
+                    try:
+                        # Attempt to grab the most recent frame from the buffer
+                        frame = await asyncio.wait_for(ingest_video_track.recv(), timeout=0.001)
+                        latest_frame = frame
+                        frames_drained += 1
+                    except asyncio.TimeoutError:
+                        break
+                
+                if latest_frame is None:
+                    is_inferencing = False
+                    continue
+                
+                if frames_drained > 1:
+                    print(f"[BUFFER] Drained {frames_drained} frames")
+                
+                img = latest_frame.to_ndarray(format="bgr24")
+                
+                # Run YOLO in a thread to keep the event loop responsive
+                detections, infer_ms = await asyncio.to_thread(_run_yolo_on_frame, img)
+                
+                inference_count += 1
+                current_time = time.time()
+                
+                if inference_start_time is None:
+                    inference_start_time = current_time
+                
+                elapsed = current_time - inference_start_time
+                inference_fps = inference_count / elapsed if elapsed > 0 else 0.0
+                last_inference_time = current_time
+                
+                # Store detections and raw frame for annotation
+                async with detections_lock:
+                    current_detections = detections
+                
+                global latest_raw_frame
+                async with annotated_frame_lock:
+                    latest_raw_frame = img.copy()
+                
+                # Log results
+                anomalies = [d for d in detections if d.get('is_anomaly', False)]
+                if detections:
+                    print(f"\n[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - Found {len(detections)} object(s) ({infer_ms:.1f}ms):")
+                    for i, d in enumerate(detections, 1):
+                        print(f"  {i}. {d['class_name']} ({d['confidence']*100:.1f}%)")
+                else:
+                    print(f"[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - No objects detected ({infer_ms:.1f}ms)")
+                
+                if anomalies:
+                    print(f"ANOMALY: {', '.join([a['class_name'] for a in anomalies])}")
             
-            inference_count += 1
-            current_time = time.time()
-            
-            if inference_start_time is None:
-                inference_start_time = current_time
-            
-            elapsed = current_time - inference_start_time
-            inference_fps = inference_count / elapsed if elapsed > 0 else 0.0
-            last_inference_time = current_time
-            
-            # Store detections and raw frame for annotation
-            async with detections_lock:
-                current_detections = detections
-            
-            global latest_raw_frame
-            async with annotated_frame_lock:
-                latest_raw_frame = img.copy()
-            
-            # Log results
-            anomalies = [d for d in detections if d.get('is_anomaly', False)]
-            if detections:
-                print(f"\n[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - Found {len(detections)} object(s) ({infer_ms:.1f}ms):")
-                for i, d in enumerate(detections, 1):
-                    print(f"  {i}. {d['class_name']} ({d['confidence']*100:.1f}%)")
-            else:
-                print(f"[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - No objects detected ({infer_ms:.1f}ms)")
-            
-            if anomalies:
-                print(f"ANOMALY: {', '.join([a['class_name'] for a in anomalies])}")
-        
-        except asyncio.TimeoutError:
-            print("[INFERENCE] Timeout waiting for frame")
-        except Exception as e:
-            print(f"[INFERENCE] Error: {type(e).__name__}: {str(e)[:100]}")
-        finally:
-            is_inferencing = False
+            except asyncio.TimeoutError:
+                print("[INFERENCE] Timeout waiting for frame")
+            except Exception as e:
+                print(f"[INFERENCE] Error: {type(e).__name__}: {str(e)[:100]}")
+            finally:
+                is_inferencing = False
+
+    except asyncio.CancelledError:
+        print("[INFERENCE] Worker received stop signal. Cleaning up...")
+    finally:
+        # Ensure we reset the state on exit
+        is_inferencing = False
 
 # Annotation Worker - Draws bounding boxes
 async def annotation_worker():
     global latest_annotated_jpeg
     
     print("[ANNOTATION] Worker started - waiting for frames...")
-    
-    while True:
-        await asyncio.sleep(0.05) # ~20 FPS
-        
-        # Get current frame and detections
-        async with annotated_frame_lock:
-            frame = latest_raw_frame
-        
-        async with detections_lock:
-            detections_copy = current_detections.copy()
-        
-        if frame is None:
-            continue
-        
-        try:
-            annotated = frame.copy()
-            
-            # Draw each detection
-            for det in detections_copy:
-                x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
-                is_anomaly = det.get("is_anomaly", False)
-                track_id = det.get("track_id")
-                
-                # Color: red for anomalies, green for normal
-                color = (0, 0, 255) if is_anomaly else (0, 255, 0)
-                thickness = 3 if is_anomaly else 2
-                
-                # Draw bounding box
-                cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
-                
-                # Label with track ID if available
-                label = f"{det['class_name']} {det['confidence']*100:.1f}%"
-                if track_id is not None:
-                    label = f"ID:{track_id} {label}"
-                
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.6
-                font_thickness = 2
-                (label_w, label_h), baseline = cv2.getTextSize(label, font, font_scale, font_thickness)
-                cv2.rectangle(annotated, (x1, y1 - label_h - 10), (x1 + label_w, y1), color, -1)
-                cv2.putText(annotated, label, (x1, y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
 
-            # Encode to JPEG
-            ret, buffer = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            if ret:
-                async with annotated_frame_lock:
-                    latest_annotated_jpeg = buffer.tobytes()
-            else:
-                print("[ANNOTATION] Failed to encode JPEG")
-        
-        except Exception as e:
-            print(f"[ANNOTATION] Error: {type(e).__name__}: {str(e)}")
+    frame_counter = 0
+    
+    try:
+        while not stop_event.is_set():
+            await asyncio.sleep(0.05) # ~20 FPS
+            
+            # Get current frame and detections
+            async with annotated_frame_lock:
+                frame = latest_raw_frame
+            
+            async with detections_lock:
+                detections_copy = current_detections.copy()
+            
+            if frame is None:
+                continue
+            
+            try:
+                annotated = frame.copy()
+                
+                # Draw each detection
+                for det in detections_copy:
+                    x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
+                    is_anomaly = det.get("is_anomaly", False)
+                    track_id = det.get("track_id")
+                    
+                    # Color: red for anomalies, green for normal
+                    color = (0, 0, 255) if is_anomaly else (0, 255, 0)
+                    thickness = 3 if is_anomaly else 2
+                    
+                    # Draw bounding box
+                    cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
+                    
+                    # Label with track ID if available
+                    label = f"{det['class_name']} {det['confidence']*100:.1f}%"
+                    if track_id is not None:
+                        label = f"ID:{track_id} {label}"
+                    
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 0.6
+                    font_thickness = 2
+                    (label_w, label_h), baseline = cv2.getTextSize(label, font, font_scale, font_thickness)
+                    cv2.rectangle(annotated, (x1, y1 - label_h - 10), (x1 + label_w, y1), color, -1)
+                    cv2.putText(annotated, label, (x1, y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
+
+                # Encode to JPEG
+                ret, buffer = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if ret:
+                    async with annotated_frame_lock:
+                        latest_annotated_jpeg = buffer.tobytes()
+                    
+                    if manager.active_connections:
+                        frame_counter += 1
+                        if frame_counter % 2 == 0:
+                            await manager.broadcast({"type": "NEW_FRAME"})
+                        if frame_counter >= 4:
+                            await manager.broadcast({"type": "NEW_DATA"})
+                            frame_counter = 0
+                else:
+                    print("[ANNOTATION] Failed to encode JPEG")
+            
+            except Exception as e:
+                print(f"[ANNOTATION] Error during processing: {type(e).__name__}: {str(e)}")
+
+    except asyncio.CancelledError:
+        print("[ANNOTATION] Worker received stop signal. Cleaning up...")
 
 # Server Startup / Shutdown Process
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- STARTUP ---
     global model, device
     
     print("[STARTUP] Pure Inference Server starting...")
@@ -290,8 +329,9 @@ async def startup():
     
     print(f"Model loaded on {device.upper()} with FP16={USE_FP16}")
     
-    asyncio.create_task(inference_worker())
-    asyncio.create_task(annotation_worker())
+    # Create tasks and store them so we can cancel them later
+    inf_task = asyncio.create_task(inference_worker())
+    ann_task = asyncio.create_task(annotation_worker())
     
     print(f"Server ready: http://localhost:{PORT}")
     print(f"Detection Stats: http://localhost:{PORT}/")
@@ -299,12 +339,51 @@ async def startup():
     print(f"WHIP endpoint: http://localhost:{PORT}/whip")
     print(f"Ready to receive WebRTC stream from OBS")
 
-@app.on_event("shutdown")
-async def shutdown():
+    yield # --- SERVER RUNNING ---
+
+    # --- SHUTDOWN ---
     global pc
-    print("[SHUTDOWN] Closing peer connection...")
+    print("[SHUTDOWN] Cleaning up resources...")
+    
+    # 1. Signal and cancel background workers
+    stop_event.set()
+    inf_task.cancel()
+    ann_task.cancel()
+    
+    # Wait for workers to acknowledge cancellation
+    await asyncio.gather(inf_task, ann_task, return_exceptions=True)
+    
+    # 2. Close all WebSocket connections
+    for ws in manager.active_connections:
+        try:
+            await ws.close()
+        except:
+            pass
+    
+    # 3. Close WebRTC connection
     if pc:
-        await pc.close()
+        print("[SHUTDOWN] Closing WebRTC peer connection...")
+        try:
+            # We await the close directly here
+            await pc.close()
+        except Exception as e:
+            print(f"[SHUTDOWN] WebRTC close error: {e}")
+
+    print("[SHUTDOWN] Done.")
+
+# Global State
+app = FastAPI(lifespan=lifespan)
+
+# Allowed connections
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "*", 
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Endpoint for OBS to stream to
 # Establish connection via WHIP (WebRTC-HTTP Ingestion Protocol)
@@ -385,6 +464,17 @@ async def get_annotated_frame():
         updated_jpeg = latest_annotated_jpeg
     
     return Response(content=updated_jpeg, media_type="image/jpeg")
+
+@app.websocket("/updates")
+async def websocket_updates(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while not stop_event.is_set():
+          await asyncio.sleep(5)
+    except (WebSocketDisconnect, asyncio.CancelledError):
+        manager.disconnect(websocket)
+    finally:
+        manager.disconnect(websocket)
 
 @app.get("/video-view")
 async def video_view():
@@ -807,5 +897,7 @@ def index():
 </html>
     """)
 
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
 if __name__ == "__main__":
-    uvicorn.run(app, host=HOST, port=PORT, log_level="info")
+    uvicorn.run(app, host=HOST, port=PORT, log_level="info", ws="websockets")

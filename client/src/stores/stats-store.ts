@@ -8,7 +8,7 @@ export const useStatsStore = defineStore("stats", () => {
     const loading = ref(false);
     const error = ref<string | null>(null);
 
-    let intervalId: number | null = null;
+    // let intervalId: number | null = null;
 
     async function fetchStats() {
         loading.value = true;
@@ -24,38 +24,38 @@ export const useStatsStore = defineStore("stats", () => {
         }
     }
 
-    //async polling functions to continuously fetch from backend
-    function startPolling(intervalMs = 100) {
-        if (intervalId !== null) return;
+    // //async polling functions to continuously fetch from backend
+    // function startPolling(intervalMs = 100) {
+    //     if (intervalId !== null) return;
 
-        const poll = async () => {
-            await fetchStats();
-            intervalId = window.setTimeout(poll, intervalMs);
-        };
+    //     const poll = async () => {
+    //         await fetchStats();
+    //         intervalId = window.setTimeout(poll, intervalMs);
+    //     };
 
-        poll();
-    }
+    //     poll();
+    // }
 
-    function stopPolling() {
-        if (intervalId !== null) {
-            clearInterval(intervalId);
-            intervalId = null;
-        }
-    }
+    // function stopPolling() {
+    //     if (intervalId !== null) {
+    //         clearInterval(intervalId);
+    //         intervalId = null;
+    //     }
+    // }
 
     //Compute values here for easy imports - can remove later if unneeded.
     const has_stream = computed(() => stats.value?.has_stream);
     const is_processing = computed(() => stats.value?.is_processing);
-    const interference_count = computed(() => stats.value?.interference_count);
-    const interference_fps = computed(() => stats.value?.interference_fps);
+    const interference_count = computed(() => stats.value?.inference_count);
+    const interference_fps = computed(() => stats.value?.inference_fps);
 
     return {
         stats,
         loading,
         error,
         fetchStats,
-        startPolling,
-        stopPolling,
+        // startPolling,
+        // stopPolling,
         has_stream,
         is_processing,
         interference_count,

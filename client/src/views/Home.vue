@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { onMounted, onUnmounted, watch } from 'vue';
+    import { onMounted, onUnmounted, watch, ref } from 'vue';
     import { useDetectionsStore } from '@/stores/detections-store';
     import { useStatsStore } from '@/stores/stats-store';
     import { useFramesStore } from '@/stores/frames-store';
@@ -15,10 +15,34 @@
     const framesStore = useFramesStore();
     const analyticsStore = useAnalyticsStore();
 
+    const socket = ref<WebSocket | null>(null);
+
     onMounted(() => {
-        detectionsStore.startPolling(200);
-        statsStore.startPolling(200);
-        framesStore.startPolling(50);
+        //Initialize socket connection with backend
+        socket.value = new WebSocket("ws://localhost:8000/updates");
+        socket.value.onopen = () => {
+            console.log("Connected to Drone Inference Server");
+        };
+
+        socket.value.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if(data.type === "NEW_FRAME") {
+                //Frame fetch
+                framesStore.getNewFrame();
+            }
+            if (data.type === "NEW_DATA") {
+                // JSON data fetches
+                detectionsStore.fetchDetections();
+                statsStore.fetchStats();
+            }
+        };
+
+        socket.value.onerror = (error) => console.error("Socket Error:", error);
+        socket.value.onclose = () => console.log("Socket Closed");
+
+        // detectionsStore.startPolling(200);
+        // statsStore.startPolling(200);
+        // framesStore.startPolling(50);
     })
 
     watch(
@@ -30,9 +54,13 @@
     );
 
     onUnmounted(() => {
-        detectionsStore.stopPolling();
-        statsStore.stopPolling();
-        framesStore.stopPolling();
+        if (socket.value) {
+            socket.value.close();
+        }
+
+        // detectionsStore.stopPolling();
+        // statsStore.stopPolling();
+        // framesStore.stopPolling();
     })
 
 </script>

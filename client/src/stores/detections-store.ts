@@ -14,7 +14,7 @@ export const useDetectionsStore = defineStore("detections", () => {
 
     const seenTrackingIds = ref<Set<number>>(new Set());
 
-    let intervalId: number | null = null;
+    // let intervalId: number | null = null;
 
     async function fetchDetections() {
         loading.value = true;
@@ -59,23 +59,23 @@ export const useDetectionsStore = defineStore("detections", () => {
         seenTrackingIds.value.clear();
     }
 
-    function startPolling(intervalMs = 100) {
-        if (intervalId !== null) return;
+    // function startPolling(intervalMs = 100) {
+    //     if (intervalId !== null) return;
 
-        const poll = async () => {
-            await fetchDetections();
-            intervalId = window.setTimeout(poll, intervalMs);
-        };
+    //     const poll = async () => {
+    //         await fetchDetections();
+    //         intervalId = window.setTimeout(poll, intervalMs);
+    //     };
 
-        poll();
-    }
+    //     poll();
+    // }
 
-    function stopPolling() {
-        if (intervalId !== null) {
-            clearTimeout(intervalId);
-            intervalId = null;
-        }
-    }
+    // function stopPolling() {
+    //     if (intervalId !== null) {
+    //         clearTimeout(intervalId);
+    //         intervalId = null;
+    //     }
+    // }
 
     const groupedDetections = computed(() =>
         Object.values(detectionCounts.value)
@@ -131,8 +131,8 @@ export const useDetectionsStore = defineStore("detections", () => {
         loading,
         error,
         fetchDetections,
-        startPolling,
-        stopPolling,
+        // startPolling,
+        // stopPolling,
         resetCounts,
         detectionCounts,
         groupedDetections,
