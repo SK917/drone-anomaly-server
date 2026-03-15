@@ -32,4 +32,15 @@
     scrollbar-width: thin;
     scrollbar-color: #4b5563 #111827;
   }
+
+  /* Hide default arrows */
+  .no-spinner::-webkit-inner-spin-button,
+  .no-spinner::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .no-spinner {
+    -moz-appearance: textfield; /* Firefox */
+  }
 }

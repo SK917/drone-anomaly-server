@@ -51,24 +51,21 @@
                 </button>
             </div>
         </div>
-        <div class="ml-4 mr-4 w-[calc(100%-2rem)] h-60 bg-gray-800 rounded-sm p-2 overflow-y-auto detections-scroll">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1 content-start">
-                <div v-if="detectionsStore.groupedDetectionsSorted.length===0" 
-                    class="col-span-1 md:col-span-2 lg:col-span-3 h-full flex items-center justify-center text-gray-400 text-lg font-orbit">
+        <div class="ml-4 mr-4 w-[calc(100%-2rem)] h-60 bg-gray-800 rounded-sm overflow-x-auto overflow-y-hidden detections-scroll">
+            <div class="flex flex-nowrap gap-2 h-full p-2">
+                <div v-if="detectionsStore.groupedDetectionsSorted.length === 0" 
+                    class="w-full h-full flex items-center justify-center text-gray-400 text-lg font-orbit shrink-0">
                     No detections.
                 </div>
-                
                 <DetectionCard
                     v-else
-                    v-for="item in (
-                        anomaliesOnly
-                        ? detectionsStore.groupedAnomalies
-                        : detectionsStore.groupedDetectionsSorted
-                    )"
+                    v-for="item in (anomaliesOnly ? detectionsStore.groupedAnomalies : detectionsStore.groupedDetectionsSorted)"
                     :key="item.detection.class_id"
-                    :detect="{ ... item.detection, confidence: getConfidence(item) }"
+                    :detect="{ ...item.detection, confidence: getConfidence(item) }"
                     :numDetects="getNumDetects(item)"
+                    class="min-w-64"
                 />
+                <div class="inline-block w-2 shrink-0 h-full"></div>
             </div>
         </div>
     </div>
