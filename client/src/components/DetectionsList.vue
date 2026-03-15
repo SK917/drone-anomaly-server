@@ -2,12 +2,14 @@
     import { ref } from 'vue';
     import { useDetectionsStore } from '@/stores/detections-store';
     import { useAnomaliesStore } from '@/stores/anomalies-store';
+    import { useAnalyticsStore } from '@/stores/analytics-store';
     import type { Detection, DetectionsResponse } from '@/services/types';
     import DetectionCard from './DetectionCard.vue';
     import { RefreshCw } from 'lucide-vue-next';
 
     const detectionsStore = useDetectionsStore();
     const anomaliesStore = useAnomaliesStore();
+    const analyticsStore = useAnalyticsStore();
     const anomaliesOnly = ref(false);
 
     const toggleAnomalies = () => {
@@ -63,7 +65,7 @@
                     :key="item.detection.class_id"
                     :detect="{ ...item.detection, confidence: getConfidence(item) }"
                     :numDetects="getNumDetects(item)"
-                    class="min-w-64"
+                    class="min-w-64 max-w-64"
                 />
                 <div class="inline-block w-2 shrink-0 h-full"></div>
             </div>
