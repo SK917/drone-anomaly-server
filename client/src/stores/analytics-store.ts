@@ -1,49 +1,68 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { useDetectionsStore } from "./detections-store";
+import { useAnomaliesStore } from "./anomalies-store";
 import type { Detection, FrequencyItem } from "@/services/types.ts";
 
 export const useAnalyticsStore = defineStore("analytics", () => {
     const detectionsStore = useDetectionsStore();
+    const anomaliesStore = useAnomaliesStore();
 
-    const totalDetections = ref(0);
     const totalConfidence = ref(0);
 
-    const maxDetection = ref<Detection | null>(null);
+    const maxDetectionRef = ref<Detection | null>(null);
     const minDetection = ref<Detection | null>(null);
 
     const objectCounts = ref<Record<number, number>>({});
-    const anomalyCounts = ref<Record<number, number>>({});
     const classInfo = ref<Record<number, { class_name: string }>>({});
     const seenTrackingIds = ref<Set<number>>(new Set());
+
+    const anomalyCounts = computed(() => {
+        const counts: Record<number, number> = {};
+        for (const anomaly of anomaliesStore.anomalies) {
+            counts[anomaly.class_id] = (counts[anomaly.class_id] ?? 0) + 1;
+        }
+        return counts;
+    });
+
+    function getEffectiveConfidence(det: Detection): number {
+        if (det.is_anomaly) {
+            const logged = anomaliesStore.anomalies.find(a => a.track_id === det.track_id);
+            return logged?.confidence ?? det.confidence;
+        }
+        return det.confidence;
+    }
 
     function processDetections(detections: Detection[]) {
         detections.forEach((det) => {
             if (det.track_id === null) return;
-            if (seenTrackingIds.value.has(det.track_id)) return;
-            seenTrackingIds.value.add(det.track_id);
 
-            totalDetections.value++;
-            totalConfidence.value += det.confidence;
+            const currentConfidence = getEffectiveConfidence(det);
+            const currentMaxConfidence = maxDetectionRef.value
+                ? getEffectiveConfidence(maxDetectionRef.value)
+                : -1;
 
-            if (!classInfo.value[det.class_id]) {
-                classInfo.value[det.class_id] = {
-                    class_name: det.class_name,
-                };
-            }
-
-            if (!maxDetection.value || det.confidence > maxDetection.value.confidence) {
-                maxDetection.value = det;
+            if (currentConfidence > currentMaxConfidence) {
+                maxDetectionRef.value = det;
             }
 
             if (!minDetection.value || det.confidence < minDetection.value.confidence) {
                 minDetection.value = det;
             }
 
-            if (det.is_anomaly) {
-                anomalyCounts.value[det.class_id] =
-                    (anomalyCounts.value[det.class_id] ?? 0) + 1;
-            } else {
+            if (seenTrackingIds.value.has(det.track_id)) return;
+
+            const nextSet = new Set(seenTrackingIds.value);
+            nextSet.add(det.track_id);
+            seenTrackingIds.value = nextSet;
+
+            totalConfidence.value += det.confidence;
+
+            if (!classInfo.value[det.class_id]) {
+                classInfo.value[det.class_id] = { class_name: det.class_name };
+            }
+
+            if (!det.is_anomaly) {
                 objectCounts.value[det.class_id] =
                     (objectCounts.value[det.class_id] ?? 0) + 1;
             }
@@ -58,29 +77,35 @@ export const useAnalyticsStore = defineStore("analytics", () => {
     }
 
     function resetAnalytics() {
-        totalDetections.value = 0;
         totalConfidence.value = 0;
-        maxDetection.value = null;
+        maxDetectionRef.value = null;
         minDetection.value = null;
         objectCounts.value = {};
-        anomalyCounts.value = {};
         classInfo.value = {};
-        seenTrackingIds.value.clear();
+        seenTrackingIds.value = new Set();
     }
 
-    const averageConfidence = computed(() =>
-        totalDetections.value === 0
-            ? 0
-            : totalConfidence.value / totalDetections.value
-    );
+    const maxDetection = computed(() => {
+        if (!maxDetectionRef.value) return null;
+        if (!maxDetectionRef.value.is_anomaly) return maxDetectionRef.value;
+        const logged = anomaliesStore.anomalies.find(
+            a => a.track_id === maxDetectionRef.value!.track_id
+        );
+        return logged ?? maxDetectionRef.value;
+    });
+
+    const averageConfidence = computed(() => {
+        const total = seenTrackingIds.value.size;
+        return total === 0 ? 0 : totalConfidence.value / total;
+    });
+
+    const totalAnomalies = computed(() => anomaliesStore.anomalies.length);
 
     const totalObjects = computed(() =>
         Object.values(objectCounts.value).reduce((a, b) => a + b, 0)
     );
 
-    const totalAnomalies = computed(() =>
-        Object.values(anomalyCounts.value).reduce((a, b) => a + b, 0)
-    );
+    const totalDetections = computed(() => totalObjects.value + totalAnomalies.value);
 
     const totalObjectDistribution = computed(() =>
         totalDetections.value === 0
@@ -125,9 +150,9 @@ export const useAnalyticsStore = defineStore("analytics", () => {
     );
 
     function getFrequencyFromList(list: FrequencyItem[], classId: number): number {
-        const item = list.find(item => item.class_id === classId)
-        if (!item) return 0
-        return Number((item.frequency * 100).toFixed(2))
+        const item = list.find(item => item.class_id === classId);
+        if (!item) return 0;
+        return Number((item.frequency * 100).toFixed(2));
     }
 
     function getFrequenciesForClass(classId: number) {
@@ -154,6 +179,7 @@ export const useAnalyticsStore = defineStore("analytics", () => {
     return {
         updateDetections,
         resetAnalytics,
+        seenTrackingIds,
         totalDetections,
         totalObjects,
         totalAnomalies,

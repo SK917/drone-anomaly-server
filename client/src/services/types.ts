@@ -24,6 +24,17 @@ export interface StatsResponse {
     is_processing: boolean
 }
 
+export interface AnomaliesResponse {
+    count: number
+    classes: ClassItem[]
+    anomalies: Detection[]
+}
+
+export interface ClassItem {
+    class_id: number
+    class_name: string
+}
+
 export interface FrequencyItem {
     class_id: number;
     class_name: string;
