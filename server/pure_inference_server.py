@@ -12,6 +12,7 @@ from aiortc.contrib.media import MediaRelay
 from aiortc.sdp import candidate_from_sdp
 from ultralytics import YOLO
 import uvicorn
+import anomaly_det
 
 # =========================
 # CONFIG
@@ -152,6 +153,7 @@ async def inference_worker():
             inference_fps = inference_count / elapsed if elapsed > 0 else 0.0
             last_inference_time = current_time
             
+            anomaly_det.get_anomalies(dets)
             # Store detections
             async with detections_lock:
                 current_detections = dets

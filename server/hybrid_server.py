@@ -12,13 +12,14 @@ import aiortc.contrib.media
 import aiortc.sdp
 from ultralytics import YOLO
 import uvicorn
+import anomaly_det
 
 # Config
 HOST = "0.0.0.0"
 PORT = 8000
 
 # MODEL_PATH = "yolo11s.pt"
-MODEL_PATH = "noMarkingsDodo.pt"
+MODEL_PATH = "yolo11s.pt"
 CONFIDENCE = 0.5
 IMG_SIZE = 480
 
@@ -84,6 +85,7 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
     )
     infms = (time.time() - t0) * 1000.0
 
+    '''
     detections: List[Dict[str, Any]] = []
     for det in results:
         names = getattr(det, "names", {})
@@ -109,7 +111,8 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
                 "track_id": track_id,
                 "is_anomaly": class_name.lower() in [anomaly.lower() for anomaly in ANOMALY_CLASSES]
             })
-    
+      '''
+    detections = anomaly_det.get_anomalies(results, ANOMALY_CLASSES, [8,8,1])
     return detections, infms
 
 # Inference Worker
@@ -159,7 +162,6 @@ async def inference_worker():
             img = latest_frame.to_ndarray(format="bgr24")
             
             detections, infer_ms = await asyncio.to_thread(_run_yolo_on_frame, img)
-            
             inference_count += 1
             current_time = time.time()
             
@@ -228,9 +230,11 @@ async def annotation_worker():
                 # Color: red for anomalies, green for normal
                 color = (0, 0, 255) if is_anomaly else (0, 255, 0)
                 thickness = 3 if is_anomaly else 2
-                
+                center = anomaly_det.get_center(det["bbox"])
+                print(center)
                 # Draw bounding box
                 cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
+                cv2.circle(annotated, (center[0], center[1]), 4, color, thickness)
                 
                 # Label with track ID if available
                 label = f"{det['class_name']} {det['confidence']*100:.1f}%"
@@ -808,4 +812,4 @@ def index():
     """)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host=HOST, port=PORT, log_level="info")
+    uvicorn.run(app, host=HOST, port=PORT, log_level="critical")
