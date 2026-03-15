@@ -1,11 +1,11 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { getAnomalies } from "@/services/anomalies-service";
-import { useAnalyticsStore } from "./analytics-store";
+import { useDetectionsStore } from "./detections-store";
 import type { AnomaliesResponse, ClassItem, Detection } from "@/services/types.ts";
 
 export const useAnomaliesStore = defineStore("anomalies", () => {
-    const analyticsStore = useAnalyticsStore();
+    const detectionsStore = useDetectionsStore();
     const anomalyData = ref<AnomaliesResponse | null>(null);
     const loading = ref(false);
     const error = ref<string | null>(null);
@@ -35,9 +35,11 @@ export const useAnomaliesStore = defineStore("anomalies", () => {
 
     const anomalies = computed(() => {
         const allAnomalies = anomalyData.value?.anomalies ?? [];
+        console.log('Anomalies list track IDs:', allAnomalies.map(a => a.track_id));
+        console.log('SeenTrackingIds:', [...detectionsStore.seenTrackingIds]);
         return allAnomalies.filter(anomaly => 
             anomaly.track_id !== null && 
-            analyticsStore.seenTrackingIds.has(anomaly.track_id)
+            detectionsStore.seenTrackingIds.has(anomaly.track_id)
         );
     });
 

@@ -1,15 +1,38 @@
 <script setup lang="ts">
     import { ref } from 'vue';
     import { useDetectionsStore } from '@/stores/detections-store';
+    import { useAnomaliesStore } from '@/stores/anomalies-store';
     import type { Detection, DetectionsResponse } from '@/services/types';
     import DetectionCard from './DetectionCard.vue';
     import { RefreshCw } from 'lucide-vue-next';
 
     const detectionsStore = useDetectionsStore();
+    const anomaliesStore = useAnomaliesStore();
     const anomaliesOnly = ref(false);
 
     const toggleAnomalies = () => {
         anomaliesOnly.value = !anomaliesOnly.value;
+    }
+
+    // Helper functions to mitigate race conditions when fetching detections
+    function getNumDetects(item: { detection: Detection, numDetects: number }) {
+        if (item.detection.is_anomaly) {
+            return anomaliesStore.anomalies.filter(
+                a => a.class_id === item.detection.class_id
+            ).length;
+        }
+        return item.numDetects;
+    }
+
+    function getConfidence(item: { detection: Detection, numDetects: number }) {
+        if (item.detection.is_anomaly) {
+            const classAnomalies = anomaliesStore.anomalies.filter(
+                a => a.class_id === item.detection.class_id
+            );
+            if (classAnomalies.length === 0) return item.detection.confidence;
+            return Math.max(...classAnomalies.map(a => a.confidence));
+        }
+        return item.detection.confidence;
     }
 
 </script>
@@ -43,8 +66,8 @@
                         : detectionsStore.groupedDetectionsSorted
                     )"
                     :key="item.detection.class_id"
-                    :detect="item.detection"
-                    :numDetects="item.numDetects"
+                    :detect="{ ... item.detection, confidence: getConfidence(item) }"
+                    :numDetects="getNumDetects(item)"
                 />
             </div>
         </div>

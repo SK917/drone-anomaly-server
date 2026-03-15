@@ -238,7 +238,9 @@ async def inference_worker():
 
                     # Notify the connected clients if something was added OR improved
                     if should_broadcast:
-                        await manager.broadcast({"type": "NEW_ANOMALY"})
+                        # await manager.broadcast({"type": "NEW_ANOMALY"})
+                        global anomaly_update_pending
+                        anomaly_update_pending = True
                 else:
                     # Clear history if no one is watching to keep session fresh
                     if seen_anomaly_ids:
@@ -330,7 +332,15 @@ async def annotation_worker():
                         if frame_counter % 2 == 0:
                             await manager.broadcast({"type": "NEW_FRAME"})
                         if frame_counter >= 4:
+                            # Send the standard data update
                             await manager.broadcast({"type": "NEW_DATA"})
+                            
+                            # Check if an anomaly change was flagged by the inference worker
+                            global anomaly_update_pending
+                            if anomaly_update_pending:
+                                await manager.broadcast({"type": "NEW_ANOMALY"})
+                                anomaly_update_pending = False # Reset the flag
+                                
                             frame_counter = 0
                 else:
                     print("[ANNOTATION] Failed to encode JPEG")

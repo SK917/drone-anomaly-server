@@ -69,6 +69,8 @@
 
     onUnmounted(() => {
         if (socket.value) {
+            detectionsStore.resetCounts();
+            analyticsStore.resetAnalytics();
             socket.value.close();
         }
     })

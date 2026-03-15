@@ -48,8 +48,8 @@
                     
             <SearchCard
                 v-else
-                v-for="anomaly in filteredAnomalies"
-                :key="anomaly.track_id ?? anomaly.class_id"
+                v-for="anomaly, index in filteredAnomalies"
+                :key="anomaly.track_id ?? `idx-${index}`"
                 :anomaly="anomaly"
             />
         </div>

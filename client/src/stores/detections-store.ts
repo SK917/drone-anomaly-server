@@ -26,22 +26,32 @@ export const useDetectionsStore = defineStore("detections", () => {
 
             detectionsArray.forEach((det) => {
                 if (det.track_id === null) return;
-                if (seenTrackingIds.value.has(det.track_id)) return;
-
-                seenTrackingIds.value.add(det.track_id);
 
                 const id = det.class_id;
                 const existing = detectionCounts.value[id];
 
-                if (!existing) {
-                    detectionCounts.value[id] = {
-                        detection: det,
-                        numDetects: 1,
-                    };
+                if (!seenTrackingIds.value.has(det.track_id)) {
+                    const nextSet = new Set(seenTrackingIds.value);
+                    nextSet.add(det.track_id);
+                    seenTrackingIds.value = nextSet;
+
+                    if (!existing) {
+                        detectionCounts.value[id] = {
+                            detection: det,
+                            numDetects: 1,
+                        };
+                    } else {
+                        existing.numDetects++;
+                        if (det.confidence > existing.detection.confidence) {
+                            existing.detection = det;
+                        }
+                    }
                 } else {
-                    existing.numDetects++;
-                    if (det.confidence > existing.detection.confidence) {
-                        existing.detection = det;
+                    // If higher confidence was found, record it even if tracking ID was seen before
+                    if (existing &&
+                        existing.detection.track_id === det.track_id &&
+                        det.confidence > existing.detection.confidence) {
+                        existing.detection = { ...existing.detection, confidence: det.confidence };
                     }
                 }
             });
@@ -56,7 +66,7 @@ export const useDetectionsStore = defineStore("detections", () => {
 
     function resetCounts() {
         detectionCounts.value = {};
-        seenTrackingIds.value.clear();
+        seenTrackingIds.value = new Set();
     }
 
     // function startPolling(intervalMs = 100) {
@@ -134,6 +144,7 @@ export const useDetectionsStore = defineStore("detections", () => {
         // startPolling,
         // stopPolling,
         resetCounts,
+        seenTrackingIds,
         detectionCounts,
         groupedDetections,
         groupedDetectionsSorted,
