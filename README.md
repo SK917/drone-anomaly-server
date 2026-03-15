@@ -114,8 +114,9 @@ If you are running it for the first time, the server may run some initial setup 
 
 | Endpoint | Description|
 |----------|------------|
-| /detections | JSON Detections data |
+| /detections | Detections data |
 | /stats | Stream stats |
+| /anomalies | Anomaly data for searching |
 | /annotated-frame.jpg | The latest frame processed by the server
 | /whip | OBS Endpoint |
 | /video-view | Beta frontend view |
