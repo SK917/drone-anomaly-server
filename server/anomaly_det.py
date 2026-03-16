@@ -124,31 +124,45 @@ def check_crashes(detections: List[Dict[str, Any]], thresh):
     for i in range(len(vehicles)-1):
         # check distance between each coordinate and its successor
         # x1 to x1 and x2
-        if abs(vehicles[i]["bbox"][0] - vehicles[i+1]["bbox"][0]) < thresh or abs(vehicles[i]["bbox"][0] - vehicles[i+1]["bbox"][2]) < thresh:
-            # check y1 against y1 and y2
-            if abs(vehicles[i]["bbox"][1] - vehicles[i+1]["bbox"][1]) < thresh or abs(vehicles[i]["bbox"][1] - vehicles[i+1]["bbox"][3]) < thresh:
-                if vehicles[i]["bbox"][0] < vehicles[i+1]["bbox"][0]:
-                    x1 = vehicles[i]["bbox"][0]
+        if vehicles[i]["bbox"][0] >= vehicles[i+1]["bbox"][0] and vehicles[i]["bbox"][0] <= vehicles[i+1]["bbox"][2]:
+            # check y1 and y2 against successor's y1
+            if vehicles[i]["bbox"][1] <= vehicles[i+1]["bbox"][1] and vehicles[i]["bbox"][3] >= vehicles[i+1]["bbox"][1]:
+                x1 = vehicles[i+1]["bbox"][0]
+                y1 = vehicles[i]["bbox"][1]
+                # check i y2 vs i+1 y2
+                if vehicles[i]["bbox"][3] < vehicles[i+1]["bbox"][3]:
+                    y2 = vehicles[i+1]["bbox"][3]
                 else:
-                    x1 = vehicles[i+1]["bbox"][0]
+                    y2 = vehicles[i]["bbox"][3]
+                # check i x2 vs i+1 x2
                 if vehicles[i]["bbox"][2] < vehicles[i+1]["bbox"][2]:
                     x2 = vehicles[i+1]["bbox"][2]
                 else:
                     x2 = vehicles[i]["bbox"][2]
+                #print(f"crash detected. car {vehicles[i]["track_id"]}'s x1 ({vehicles[i]["bbox"][0]}) overlaps with car {vehicles[i+1]["track_id"]}'s x1 ({vehicles[i+1]["bbox"][0]}) or x2 ({vehicles[i+1]["bbox"][2]})")
                 detections.append({
                     "class_id": None,
                     "class_name": "Crash",
                     "confidence": 1,
-                    "bbox": [x1,vehicles[i]["bbox"][1], x2,vehicles[i+1]["bbox"][3]],
+                    "bbox": [x1,y1,x2,y2],
                     "track_id": None,
                     "is_anomaly": True
                 })
-            # check y2 against y1 and y2
-            elif abs(vehicles[i]["bbox"][3] - vehicles[i+1]["bbox"][1]) < thresh or abs(vehicles[i]["bbox"][3] - vehicles[i+1]["bbox"][3]) < thresh:
+        # compare x2 to x1 and x2
+        elif vehicles[i]["bbox"][2] >= vehicles[i+1]["bbox"][0] and vehicles[i]["bbox"][2] <= vehicles[i+1]["bbox"][2]:
+            if vehicles[i]["bbox"][1] <= vehicles[i+1]["bbox"][1] and vehicles[i]["bbox"][3] >= vehicles[i+1]["bbox"][1]:
+                y1 = vehicles[i]["bbox"][1]
+                # check i x1 vs i+1 x1
                 if vehicles[i]["bbox"][0] < vehicles[i+1]["bbox"][0]:
                     x1 = vehicles[i]["bbox"][0]
                 else:
                     x1 = vehicles[i+1]["bbox"][0]
+                # check i y2 vs i+1 y2
+                if vehicles[i]["bbox"][3] < vehicles[i+1]["bbox"][3]:
+                    y2 = vehicles[i+1]["bbox"][3]
+                else:
+                    y2 = vehicles[i]["bbox"][3]
+                # check i x2 vs i+1 x2
                 if vehicles[i]["bbox"][2] < vehicles[i+1]["bbox"][2]:
                     x2 = vehicles[i+1]["bbox"][2]
                 else:
@@ -157,46 +171,7 @@ def check_crashes(detections: List[Dict[str, Any]], thresh):
                     "class_id": None,
                     "class_name": "Crash",
                     "confidence": 1,
-                    "bbox": [x1,vehicles[i]["bbox"][1], x2,vehicles[i+1]["bbox"][3]],
-                    "track_id": None,
-                    "is_anomaly": True
-                })
-
-        # x2 to x1 and x2
-        elif abs(vehicles[i]["bbox"][2] - vehicles[i+1]["bbox"][0]) < thresh or abs(vehicles[i]["bbox"][2] - vehicles[i+1]["bbox"][2]):
-            # check y1 against y1 and y2
-            if abs(vehicles[i]["bbox"][1] - vehicles[i+1]["bbox"][1]) < thresh or abs(vehicles[i]["bbox"][1] - vehicles[i+1]["bbox"][3]) < thresh:
-                if vehicles[i]["bbox"][0] < vehicles[i+1]["bbox"][0]:
-                    x1 = vehicles[i]["bbox"][0]
-                else:
-                    x1 = vehicles[i+1]["bbox"][0]
-                if vehicles[i]["bbox"][2] < vehicles[i+1]["bbox"][2]:
-                    x2 = vehicles[i+1]["bbox"][2]
-                else:
-                    x2 = vehicles[i]["bbox"][2]
-                detections.append({
-                    "class_id": None,
-                    "class_name": "Crash",
-                    "confidence": 1,
-                    "bbox": [x1,vehicles[i]["bbox"][1], x2,vehicles[i+1]["bbox"][3]],
-                    "track_id": None,
-                    "is_anomaly": True
-                })
-            # check y2 against y1 and y2
-            elif abs(vehicles[i]["bbox"][3] - vehicles[i+1]["bbox"][1]) < thresh or abs(vehicles[i]["bbox"][3] - vehicles[i+1]["bbox"][3]) < thresh:
-                if vehicles[i]["bbox"][0] < vehicles[i+1]["bbox"][0]:
-                    x1 = vehicles[i]["bbox"][0]
-                else:
-                    x1 = vehicles[i+1]["bbox"][0]
-                if vehicles[i]["bbox"][2] < vehicles[i+1]["bbox"][2]:
-                    x2 = vehicles[i+1]["bbox"][2]
-                else:
-                    x2 = vehicles[i]["bbox"][2]
-                detections.append({
-                    "class_id": None,
-                    "class_name": "Crash",
-                    "confidence": 1,
-                    "bbox": [x1,vehicles[i]["bbox"][1], x2,vehicles[i+1]["bbox"][3]],
+                    "bbox": [x1,y1,x2,y2],
                     "track_id": None,
                     "is_anomaly": True
                 })

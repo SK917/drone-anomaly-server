@@ -7,6 +7,7 @@ import torch
 from PIL import Image
 import anomaly_det
 import time
+import matplotlib.pyplot as plt
 
 MODEL_PATH = "yolo11s.pt"
 CONFIDENCE = 0.5
@@ -19,7 +20,7 @@ ANOMALY_CLASSES = ["pig", "fire", "wolf", "deer"]
 
 model = YOLO("C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Server/noMarkingsDodo.pt")
 
-img = Image.open('C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Server/server/Screenshot 2026-03-07 191200.jpg')
+img = Image.open('C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Server/server/crash.jpg')
 img_array = np.array(img)
 
 results = model.track(
@@ -41,4 +42,30 @@ detections = anomaly_det.get_anomalies(results, ANOMALY_CLASSES, [6,6,10])
 
 end = time.perf_counter()
 print(end-start)
-#print(detections)
+print(detections)
+
+for det in detections:
+    x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
+    is_anomaly = det.get("is_anomaly", False)
+    track_id = det.get("track_id")
+    
+    # Color: red for anomalies, green for normal
+    color = (0, 0, 255) if is_anomaly else (0, 255, 0)
+    thickness = 3 if is_anomaly else 2
+    
+    # Draw bounding box
+    cv2.rectangle(img_array, (x1, y1), (x2, y2), color, thickness)
+    
+    # Label with track ID if available
+    label = f"{det['class_name']} {det['confidence']*100:.1f}%"
+    if track_id is not None:
+        label = f"ID:{track_id} {label}"
+    
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.6
+    font_thickness = 2
+    (label_w, label_h), baseline = cv2.getTextSize(label, font, font_scale, font_thickness)
+    cv2.rectangle(img_array, (x1, y1 - label_h - 10), (x1 + label_w, y1), color, -1)
+    cv2.putText(img_array, label, (x1, y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
+
+plt.imshow(img_array)
