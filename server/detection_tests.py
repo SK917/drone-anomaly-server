@@ -9,7 +9,7 @@ import anomaly_det
 import time
 import matplotlib.pyplot as plt
 
-MODEL_PATH = "yolo11s.pt"
+MODEL_PATH = "C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Server/20260314_2Best.pt"
 CONFIDENCE = 0.5
 IMG_SIZE = 480
 USE_FP16 = True # Enable Half Precision
@@ -18,7 +18,7 @@ USE_FP16 = True # Enable Half Precision
 # ANOMALY_CLASSES = ["bear", "cow"]
 ANOMALY_CLASSES = ["pig", "fire", "wolf", "deer"]
 
-model = YOLO("C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Server/noMarkingsDodo.pt")
+model = YOLO(MODEL_PATH)
 
 img = Image.open('C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Server/server/crash.jpg')
 img_array = np.array(img)

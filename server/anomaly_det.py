@@ -29,45 +29,47 @@ def get_anomalies(yolo_output, anomaly_classes, thresholds: List):
             # Class based anomalies
             is_anomaly = class_name.lower() in [anomaly.lower() for anomaly in anomaly_classes]
             
-            # Traffic Jam
-            if class_name == "car" or class_name == "truck":
-                vehicle_count += 1
-                if traffic_box[0] == None: # x1
-                    traffic_box[0] = x1
-                elif x1 < traffic_box[0]:
-                    traffic_box[0] = x1
-                if traffic_box[1] == None: # y1
-                    traffic_box[1] = y1
-                elif y1 < traffic_box[1]:
-                    traffic_box[1] = y1
-                if traffic_box[2] == None: # x2
-                    traffic_box[2] = x2
-                elif x2 > traffic_box[2]:
-                    traffic_box[2] = x2
-                if traffic_box[3] == None: # y2
-                    traffic_box[3] = y2
-                elif y2 > traffic_box[3]:
-                    traffic_box[3] = y2
-                
-            # Crowding
-            if class_name == "person":
-                people_count += 1
-                if crowd_box[0] == None: # x1
-                    crowd_box[0] = x1
-                elif x1 < crowd_box[0]:
-                    crowd_box[0] = x1
-                if crowd_box[1] == None: # y1
-                    crowd_box[1] = y1
-                elif y1 < crowd_box[1]:
-                    crowd_box[1] = y1
-                if crowd_box[2] == None: # x2
-                    crowd_box[2] = x2
-                elif x2 > crowd_box[2]:
-                    crowd_box[2] = x2
-                if crowd_box[3] == None: # y2
-                    crowd_box[3] = y2
-                elif y2 > crowd_box[3]:
-                    crowd_box[3] = y2
+            if "Traffic Jam" in anomaly_classes:
+                # Traffic Jam
+                if class_name == "car" or class_name == "truck":
+                    vehicle_count += 1
+                    if traffic_box[0] == None: # x1
+                        traffic_box[0] = x1
+                    elif x1 < traffic_box[0]:
+                        traffic_box[0] = x1
+                    if traffic_box[1] == None: # y1
+                        traffic_box[1] = y1
+                    elif y1 < traffic_box[1]:
+                        traffic_box[1] = y1
+                    if traffic_box[2] == None: # x2
+                        traffic_box[2] = x2
+                    elif x2 > traffic_box[2]:
+                        traffic_box[2] = x2
+                    if traffic_box[3] == None: # y2
+                        traffic_box[3] = y2
+                    elif y2 > traffic_box[3]:
+                        traffic_box[3] = y2
+            
+            if "Crowding" in anomaly_classes:
+                # Crowding
+                if class_name == "person":
+                    people_count += 1
+                    if crowd_box[0] == None: # x1
+                        crowd_box[0] = x1
+                    elif x1 < crowd_box[0]:
+                        crowd_box[0] = x1
+                    if crowd_box[1] == None: # y1
+                        crowd_box[1] = y1
+                    elif y1 < crowd_box[1]:
+                        crowd_box[1] = y1
+                    if crowd_box[2] == None: # x2
+                        crowd_box[2] = x2
+                    elif x2 > crowd_box[2]:
+                        crowd_box[2] = x2
+                    if crowd_box[3] == None: # y2
+                        crowd_box[3] = y2
+                    elif y2 > crowd_box[3]:
+                        crowd_box[3] = y2
             
             detections.append({
                 "class_id": obj_class,
@@ -77,27 +79,30 @@ def get_anomalies(yolo_output, anomaly_classes, thresholds: List):
                 "track_id": track_id,
                 "is_anomaly": is_anomaly
             })
-    # Crowding
-    if people_count >= thresholds[0]:
-        detections.append({
-                "class_id": None,
-                "class_name": "Crowding",
-                "confidence": 1,
-                "bbox": crowd_box,
-                "track_id": track_id,
-                "is_anomaly": True
-            })
-    # Traffic Jam
-    if vehicle_count >= thresholds[1]:
-        detections.append({
-                "class_id": None,
-                "class_name": "Traffic Jam",
-                "confidence": 1,
-                "bbox": traffic_box,
-                "track_id": track_id,
-                "is_anomaly": True
-            })
-    detections = check_crashes(detections, thresholds[2])
+    if "Crowding" in anomaly_classes:
+        # Crowding
+        if people_count >= thresholds[0]:
+            detections.append({
+                    "class_id": None,
+                    "class_name": "Crowding",
+                    "confidence": 1,
+                    "bbox": crowd_box,
+                    "track_id": track_id,
+                    "is_anomaly": True
+                })
+    if "Traffic Jam" in anomaly_classes:
+        # Traffic Jam
+        if vehicle_count >= thresholds[1]:
+            detections.append({
+                    "class_id": None,
+                    "class_name": "Traffic Jam",
+                    "confidence": 1,
+                    "bbox": traffic_box,
+                    "track_id": track_id,
+                    "is_anomaly": True
+                })
+    if "crash" in anomaly_classes:
+        detections = check_crashes(detections, thresholds[2])
 
     return detections
 
