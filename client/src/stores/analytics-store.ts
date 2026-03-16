@@ -86,12 +86,29 @@ export const useAnalyticsStore = defineStore("analytics", () => {
     }
 
     const maxDetection = computed(() => {
-        if (!maxDetectionRef.value) return null;
-        if (!maxDetectionRef.value.is_anomaly) return maxDetectionRef.value;
-        const logged = anomaliesStore.anomalies.find(
-            a => a.track_id === maxDetectionRef.value!.track_id
-        );
-        return logged ?? maxDetectionRef.value;
+        // Access these explicitly to ensure reactivity
+        const anomalies = anomaliesStore.anomalies;
+        const detectionCounts = detectionsStore.detectionCounts;
+
+        const objectEntries = Object.values(detectionCounts)
+            .filter(e => !e.detection.is_anomaly);
+        
+        const bestObject = objectEntries.length > 0
+            ? objectEntries.reduce((max, entry) =>
+                entry.detection.confidence > max.detection.confidence ? entry : max
+            ).detection
+            : null;
+
+        const bestAnomaly = anomalies.length > 0
+            ? anomalies.reduce((max, a) =>
+                a.confidence > max.confidence ? a : max
+            )
+            : null;
+
+        if (!bestObject && !bestAnomaly) return null;
+        if (!bestObject) return bestAnomaly;
+        if (!bestAnomaly) return bestObject;
+        return bestAnomaly.confidence > bestObject.confidence ? bestAnomaly : bestObject;
     });
 
     const averageConfidence = computed(() => {
