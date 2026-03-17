@@ -22,7 +22,7 @@ HOST = "0.0.0.0"
 PORT = 8000
 
 # MODEL_PATH = "yolo11s.pt"
-MODEL_PATH = "noMarkingsDodo.pt"
+MODEL_PATH = "yolo11s.pt"
 CONFIDENCE = 0.5
 IMG_SIZE = 480
 
