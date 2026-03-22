@@ -49,6 +49,8 @@ detections_lock = asyncio.Lock()
 anomalies_list: List[Dict[str, Any]] = []
 seen_anomaly_ids: set[int] = set()
 anomalies_lock = asyncio.Lock()
+anomaly_update_pending: bool = False
+anomaly_delta: Dict[str, Any] = {"added": [], "updated": []}
 
 # Performance metrics
 inference_count: int = 0
@@ -213,8 +215,9 @@ async def inference_worker():
 
                 # Update anomalies list, broadcast new entries
                 # Only updates if there are connected clients
-                if manager.active_connections:  
-                    should_broadcast = False
+                if manager.active_connections:
+                    added_entries: List[Dict[str, Any]] = []
+                    updated_entries: List[Dict[str, Any]] = []
                     
                     async with anomalies_lock:
                         for det in anomalies:
@@ -229,21 +232,33 @@ async def inference_worker():
                                 # New anomaly: Add to list and seen set
                                 seen_anomaly_ids.add(track_id)
                                 new_entry = det.copy()
-                                new_entry["timestamp"] = time.time() # Useful for search cards
+                                new_entry["timestamp"] = time.time()
                                 anomalies_list.append(new_entry)
-                                should_broadcast = True
+                                added_entries.append(new_entry)
                             
                             elif det["confidence"] > existing_entry["confidence"]:
                                 # Existing anomaly, but better confidence: Update the record
                                 existing_entry["confidence"] = det["confidence"]
                                 existing_entry["bbox"] = det["bbox"]
-                                should_broadcast = True
+                                updated_entries.append({
+                                    "track_id": track_id,
+                                    "confidence": det["confidence"],
+                                    "bbox": det["bbox"]
+                                })
 
                     # Notify the connected clients if something was added OR improved
-                    if should_broadcast:
-                        # await manager.broadcast({"type": "NEW_ANOMALY"})
-                        global anomaly_update_pending
+                    if added_entries or updated_entries:
+                        global anomaly_update_pending, anomaly_delta
                         anomaly_update_pending = True
+                        anomaly_delta["added"].extend(added_entries)
+                        # For updates, only keep the latest confidence per track_id
+                        for update in updated_entries:
+                            existing = next((u for u in anomaly_delta["updated"] if u["track_id"] == update["track_id"]), None)
+                            if existing:
+                                existing["confidence"] = update["confidence"]
+                                existing["bbox"] = update["bbox"]
+                            else:
+                                anomaly_delta["updated"].append(update)
                 else:
                     # Clear history if no one is watching to keep session fresh
                     if seen_anomaly_ids:
@@ -335,15 +350,33 @@ async def annotation_worker():
                         if frame_counter % 2 == 0:
                             await manager.broadcast({"type": "NEW_FRAME"})
                         if frame_counter >= 4:
-                            # Send the standard data update
-                            await manager.broadcast({"type": "NEW_DATA"})
+                            global anomaly_update_pending, anomaly_delta
+                            anomalies_snapshot = [d for d in detections_copy if d.get('is_anomaly', False)]
                             
-                            # Check if an anomaly change was flagged by the inference worker
-                            global anomaly_update_pending
+                            # Detections and stats socket update
+                            await manager.broadcast({
+                                "type": "NEW_DATA",
+                                "detections": detections_copy,
+                                "timestamp": last_inference_time,
+                                "num_detections": len(detections_copy),
+                                "inference_count": inference_count,
+                                "inference_fps": round(inference_fps, 2),
+                                "has_anomaly": len(anomalies_snapshot) > 0,
+                                "anomaly_count": len(anomalies_snapshot),
+                                "stats": {
+                                    "inference_count": inference_count,
+                                    "inference_fps": round(inference_fps, 2),
+                                    "has_stream": ingest_video_track is not None,
+                                    "is_processing": is_inferencing
+                                }
+                            })
+                            
+                            # Anomalies socket update
                             if anomaly_update_pending:
-                                await manager.broadcast({"type": "NEW_ANOMALY"})
-                                anomaly_update_pending = False # Reset the flag
-                                
+                                await manager.broadcast({"type": "NEW_ANOMALY", "delta": anomaly_delta})
+                                anomaly_update_pending = False
+                                anomaly_delta = {"added": [], "updated": []}
+                            
                             frame_counter = 0
                 else:
                     print("[ANNOTATION] Failed to encode JPEG")

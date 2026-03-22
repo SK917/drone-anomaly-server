@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { getDetections } from "@/services/detections-service";
 import type { Detection, DetectionsResponse } from "@/services/types.ts";
 
 export const useDetectionsStore = defineStore("detections", () => {
@@ -8,60 +7,44 @@ export const useDetectionsStore = defineStore("detections", () => {
     const loading = ref(false);
     const error = ref<string | null>(null);
 
-    const detectionCounts = ref<
-        Record<number, { detection: Detection; numDetects: number }>
-    >({});
+    const detectionCounts = ref<Record<number, { detection: Detection; numDetects: number }>>({});
 
     const seenTrackingIds = ref<Set<number>>(new Set());
 
-    // let intervalId: number | null = null;
+    function applyData(payload: DetectionsResponse) {
+        data.value = payload;
+        const detectionsArray = payload.detections ?? [];
 
-    async function fetchDetections() {
-        loading.value = true;
-        error.value = null;
+        detectionsArray.forEach((det) => {
+            if (det.track_id === null) return;
 
-        try {
-            data.value = await getDetections();
-            const detectionsArray = data.value?.detections ?? [];
+            const id = det.class_id;
+            const existing = detectionCounts.value[id];
 
-            detectionsArray.forEach((det) => {
-                if (det.track_id === null) return;
+            if (!seenTrackingIds.value.has(det.track_id)) {
+                const nextSet = new Set(seenTrackingIds.value);
+                nextSet.add(det.track_id);
+                seenTrackingIds.value = nextSet;
 
-                const id = det.class_id;
-                const existing = detectionCounts.value[id];
-
-                if (!seenTrackingIds.value.has(det.track_id)) {
-                    const nextSet = new Set(seenTrackingIds.value);
-                    nextSet.add(det.track_id);
-                    seenTrackingIds.value = nextSet;
-
-                    if (!existing) {
-                        detectionCounts.value[id] = {
-                            detection: det,
-                            numDetects: 1,
-                        };
-                    } else {
-                        existing.numDetects++;
-                        if (det.confidence > existing.detection.confidence) {
-                            existing.detection = det;
-                        }
-                    }
+                if (!existing) {
+                    detectionCounts.value[id] = {
+                        detection: det,
+                        numDetects: 1,
+                    };
                 } else {
-                    // If higher confidence was found, record it even if tracking ID was seen before
-                    if (existing &&
-                        existing.detection.track_id === det.track_id &&
-                        det.confidence > existing.detection.confidence) {
-                        existing.detection = { ...existing.detection, confidence: det.confidence };
+                    existing.numDetects++;
+                    if (det.confidence > existing.detection.confidence) {
+                        existing.detection = det;
                     }
                 }
-            });
-
-        } catch (err) {
-            error.value = "Failed to fetch detections";
-            console.error(err);
-        } finally {
-            loading.value = false;
-        }
+            } else {
+                if (existing &&
+                    existing.detection.track_id === det.track_id &&
+                    det.confidence > existing.detection.confidence) {
+                    existing.detection = { ...existing.detection, confidence: det.confidence };
+                }
+            }
+        });
     }
 
     function resetCounts() {
@@ -69,25 +52,7 @@ export const useDetectionsStore = defineStore("detections", () => {
         seenTrackingIds.value = new Set();
     }
 
-    // function startPolling(intervalMs = 100) {
-    //     if (intervalId !== null) return;
-
-    //     const poll = async () => {
-    //         await fetchDetections();
-    //         intervalId = window.setTimeout(poll, intervalMs);
-    //     };
-
-    //     poll();
-    // }
-
-    // function stopPolling() {
-    //     if (intervalId !== null) {
-    //         clearTimeout(intervalId);
-    //         intervalId = null;
-    //     }
-    // }
-
-    const groupedDetections = computed(() =>
+    const groupedDetections = computed<{ detection: Detection; numDetects: number }[]>(() =>
         Object.values(detectionCounts.value)
     );
 
@@ -112,11 +77,11 @@ export const useDetectionsStore = defineStore("detections", () => {
         detections.value.filter(d => d.is_anomaly)
     );
 
-    const num_detections = computed<number>(() => { 
+    const num_detections = computed<number>(() => {
         return data.value?.num_detections ?? 0
     });
-    
-    const anomaly_count = computed<number>(() => { 
+
+    const anomaly_count = computed<number>(() => {
         return data.value?.anomaly_count ?? 0
     });
 
@@ -140,9 +105,7 @@ export const useDetectionsStore = defineStore("detections", () => {
         data,
         loading,
         error,
-        fetchDetections,
-        // startPolling,
-        // stopPolling,
+        applyData,
         resetCounts,
         seenTrackingIds,
         detectionCounts,

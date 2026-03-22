@@ -7,6 +7,10 @@ export interface Detection {
     is_anomaly: boolean
 }
 
+export interface Anomaly extends Detection {
+    timestamp: number
+}
+
 export interface DetectionsResponse {
     timestamp: number
     num_detections: number
@@ -27,7 +31,7 @@ export interface StatsResponse {
 export interface AnomaliesResponse {
     count: number
     classes: ClassItem[]
-    anomalies: Detection[]
+    anomalies: Anomaly[]
 }
 
 export interface ClassItem {

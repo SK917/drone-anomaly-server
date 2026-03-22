@@ -5,6 +5,7 @@
     import { useFramesStore } from '@/stores/frames-store';
     import { useAnalyticsStore } from '@/stores/analytics-store';
     import { useAnomaliesStore } from '@/stores/anomalies-store';
+    import type { DetectionsResponse, StatsResponse } from '@/services/types';
     import StreamInfo from '@/components/StreamInfo.vue';
     import VideoFeed from '@/components/VideoFeed.vue';
     import DetectionsList from '@/components/DetectionsList.vue';
@@ -21,43 +22,43 @@
     const socket = ref<WebSocket | null>(null);
 
     onMounted(() => {
-        //Initialize socket connection with backend
         socket.value = new WebSocket("ws://localhost:8000/updates");
+
         socket.value.onopen = () => {
             console.log("Connected to Drone Inference Server");
+            anomaliesStore.fetchAnomalies();
         };
 
-        let fetchingAnomalies = false;
-
         socket.value.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            switch (data.type) {
-                // Fetch frame
+            const msg = JSON.parse(event.data);
+            switch (msg.type) {
                 case "NEW_FRAME":
-                    framesStore.getNewFrame()
-                    break
+                    framesStore.getNewFrame();
+                    break;
 
-                // Fetch detections / stats data
                 case "NEW_DATA":
-                    detectionsStore.fetchDetections()
-                    statsStore.fetchStats()
-                    break
+                    detectionsStore.applyData({
+                        timestamp: msg.timestamp,
+                        num_detections: msg.num_detections,
+                        detections: msg.detections,
+                        inference_count: msg.inference_count,
+                        inference_fps: msg.inference_fps,
+                        has_anomaly: msg.has_anomaly,
+                        anomaly_count: msg.anomaly_count,
+                    } as DetectionsResponse);
+                    statsStore.applyData(msg.stats as StatsResponse);
+                    break;
 
-                // Update anomaly list (if check prevents race condition if many anomalies are detected at once)
                 case "NEW_ANOMALY":
-                    if (!fetchingAnomalies) {
-                        fetchingAnomalies = true
-                        anomaliesStore.fetchAnomalies().finally(() => {
-                            fetchingAnomalies = false
-                        })
-                    }
-                    break
+                    console.log('Delta:', msg.delta)
+                    anomaliesStore.applyDelta(msg.delta);
+                    break;
             }
         };
 
         socket.value.onerror = (error) => console.error("Socket Error:", error);
         socket.value.onclose = () => console.log("Socket Closed");
-    })
+    });
 
     watch(
         () => detectionsStore.detections,
@@ -71,10 +72,10 @@
         if (socket.value) {
             detectionsStore.resetCounts();
             analyticsStore.resetAnalytics();
+            anomaliesStore.resetAnomalies();
             socket.value.close();
         }
-    })
-
+    });
 </script>
 
 <template>
