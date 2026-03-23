@@ -72,7 +72,7 @@
 </script>
 
 <template>
-    <div class="flex flex-col h-full min-h-0  sm: pb-4 md:pb-30 ml-4 mr-4">
+    <div class="flex flex-col h-full min-h-0  sm: pb-4 md:pb-26 ml-4 mr-4">
         <div class="flex flex-row gap-2 items-center justify-between">
             <div class="flex flex-row gap-2 items-center">
                 <input
@@ -112,7 +112,7 @@
             <div class="flex flex-row gap-0">
                 <div class="flex gap-2 p-4 items-center"> 
                     <div class="text-sm text-gray-400 font-orbit"><p>Minimum</p><p>Confidence:</p></div>
-                    <div class="relative flex items-center bg-gray-800 border border-gray-700 rounded-sm min-h-9 group outline-2 outline-transparent
+                    <div class="relative flex items-center bg-slate-900 border border-gray-700 rounded-sm min-h-9 group outline-2 outline-transparent
                         has-[:focus]:outline-yellow-600 hover:not-has-[:focus]:outline-gray-500 focus-within:outline-yellow-600 transition-all">
                         <input 
                             type="number" 
@@ -141,7 +141,7 @@
                 </div>
                 <div class="flex gap-2 p-4 items-center"> 
                     <div class="text-sm text-gray-400 font-orbit"><p>Maximum</p><p>Confidence:</p></div>
-                    <div class="relative flex items-center bg-gray-800 border border-gray-700 rounded-sm min-h-9 group outline-2 outline-transparent
+                    <div class="relative flex items-center bg-slate-900 border border-gray-700 rounded-sm min-h-9 group outline-2 outline-transparent
                         has-[:focus]:outline-yellow-600 hover:not-has-[:focus]:outline-gray-500 focus-within:outline-yellow-600 transition-all">
                         <input 
                             type="number" 
@@ -172,7 +172,7 @@
         </div>
         <div class="grid grid-cols-3 lg:grid-cols-4 gap-2 pr-4 content-start overflow-y-auto detections-scroll">
             <div v-if="filteredAnomalies.length===0" 
-                class="col-span-3 lg:col-span-4 h-full flex items-center justify-center text-gray-400 text-lg font-orbit">
+                class="col-span-3 lg:col-span-4 h-full pt-10 flex items-center justify-center text-gray-400 text-lg font-orbit">
                     No anomalies.
             </div>
                     

@@ -60,7 +60,7 @@
         <div class="ml-4 mr-4 w-[calc(100%-2rem)] h-60 bg-gray-800 rounded-sm overflow-x-auto overflow-y-hidden detections-scroll">
             <div class="flex flex-nowrap gap-2 h-full p-2">
                 <div v-if="detectionsStore.groupedDetectionsSorted.length === 0" 
-                    class="w-full h-full flex items-center justify-center text-gray-400 text-lg font-orbit shrink-0">
+                    class="flex-1 h-full flex items-center justify-center text-gray-400 text-lg text-center font-orbit shrink-0">
                     No detections.
                 </div>
                 <DetectionCard

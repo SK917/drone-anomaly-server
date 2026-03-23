@@ -60,7 +60,7 @@
             <div v-if="otherInfo" class="text-gray-400 text-xs font-orbit text-center">
                 {{ otherInfo }}
             </div>
-            <div class="text-white text-sm pt-1 font-semibold font-orbit text-center">
+            <div class="text-gray-200 text-sm pt-1 font-semibold font-orbit text-center">
                 {{ label }}
             </div>
         </div>
