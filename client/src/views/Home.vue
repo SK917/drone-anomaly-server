@@ -5,6 +5,7 @@
     import { useFramesStore } from '@/stores/frames-store';
     import { useAnalyticsStore } from '@/stores/analytics-store';
     import { useAnomaliesStore } from '@/stores/anomalies-store';
+    import { useExportStore } from '@/stores/export-store';
     import type { DetectionsResponse, StatsResponse } from '@/services/types';
     import StreamInfo from '@/components/StreamInfo.vue';
     import VideoFeed from '@/components/VideoFeed.vue';
@@ -18,11 +19,13 @@
     const framesStore = useFramesStore();
     const analyticsStore = useAnalyticsStore();
     const anomaliesStore = useAnomaliesStore();
+    const exportStore = useExportStore();
 
     const socket = ref<WebSocket | null>(null);
 
     onMounted(() => {
         socket.value = new WebSocket("ws://localhost:8000/updates");
+        exportStore.initSelection();
 
         socket.value.onopen = () => {
             console.log("Connected to Drone Inference Server");

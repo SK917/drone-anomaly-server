@@ -45,3 +45,14 @@ export interface FrequencyItem {
     count: number;
     frequency: number;
 }
+
+export interface ExportRequest {
+    current_stream_stats: boolean;
+    detections_summary: boolean;
+    stats_summary: boolean;
+    all_anomalies: boolean;
+    selected_anomalies: boolean;
+    no_anomalies: boolean;
+    is_txt: boolean;
+    is_json: boolean;
+}

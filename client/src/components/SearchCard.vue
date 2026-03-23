@@ -1,23 +1,42 @@
 <script setup lang="ts">
-    import type { Detection } from '@/services/types';
-    import { computed } from 'vue';
+    import type { Anomaly } from '@/services/types';
+    import { ref, computed, watch } from 'vue';
+    import { useExportStore } from '@/stores/export-store';
 
     interface Props {
-        anomaly: Detection
+        anomaly: Anomaly
     }
     const props = defineProps<Props>();
+    const exportStore = useExportStore();
     const confidence = computed(() =>
         Number((props.anomaly.confidence * 100).toFixed(2))
     );
+    const isSelected = ref(false);
 
+    const toggleSelected = () => {
+        isSelected.value = !isSelected.value;
+        if(isSelected.value) {
+            exportStore.selectAnomaly(props.anomaly);
+        } else {
+            exportStore.deselectAnomaly(props.anomaly.track_id ?? 0);
+        }
+    }
+
+    watch(
+        () => exportStore.selectAllFlag,
+        (val) => {
+            isSelected.value = val;
+        }
+    );
 </script>
 
 <template>
-    <div class="flex flex-col items-center justify-between p-2 m-2 w-auto h-auto border border-gray-600 rounded-sm hover:border-rose-800">
+    <button 
+        @click="toggleSelected"
+        :class="isSelected ? 'border-red-500 hover:border-red-500' : 'border-gray-600 hover:border-rose-800'"
+        class="flex flex-col items-center justify-between p-2 m-2 w-auto h-auto border rounded-sm cursor-pointer"
+    >
         <div class="flex flex-row gap-2 items-center">
-            <!-- <div class="text-sm text-gray-400 font-orbit">
-                Tracking ID:
-            </div> -->
             <div class="text-3xl text-red-500 font-semibold font-tektur">
                 {{ anomaly.track_id }}
             </div>
@@ -37,5 +56,5 @@
                 </span>
             </div>
         </div>
-    </div>
+    </button>
 </template>

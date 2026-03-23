@@ -5,6 +5,7 @@
     import { useAnalyticsStore } from '@/stores/analytics-store';
     import type { Detection, DetectionsResponse } from '@/services/types';
     import DetectionCard from './DetectionCard.vue';
+    import Export from './Export.vue';
     import { RefreshCw } from 'lucide-vue-next';
 
     const detectionsStore = useDetectionsStore();
@@ -41,7 +42,7 @@
 
 <template>
     <div class="flex flex-col items-end">
-        <div class="flex flex-row w-full mt-4" >
+        <div class="flex flex-row w-full justify-between mt-4" >
             <div class="mr-4 ml-4 mb-4">
                 <button 
                     @click="toggleAnomalies"
@@ -51,6 +52,9 @@
                     <RefreshCw :size=20 class="text-amber-200"/>
                     {{ anomaliesOnly ? 'Show All Detections' : 'Show Anomalies Only'}}
                 </button>
+            </div>
+            <div class="mr-4 ml-4 mb-4">
+                <Export/>
             </div>
         </div>
         <div class="ml-4 mr-4 w-[calc(100%-2rem)] h-60 bg-gray-800 rounded-sm overflow-x-auto overflow-y-hidden detections-scroll">
