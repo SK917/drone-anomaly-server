@@ -11,7 +11,9 @@
     const confidence = computed(() =>
         Number((props.anomaly.confidence * 100).toFixed(2))
     );
-    const isSelected = ref(false);
+    const isSelected = ref(
+        exportStore.selectedAnomalies.some(a => a.track_id === props.anomaly.track_id)
+    );
 
     const toggleSelected = () => {
         isSelected.value = !isSelected.value;

@@ -67,7 +67,6 @@
         query.value = '';
         minConfidence.value = 50;
         maxConfidence.value = 100;
-        exportStore.deselectAll();
     }
 </script>
 
@@ -101,16 +100,9 @@
             </div>
         </div>
         <div class="flex flex-row gap-6 justify-between items-center">
-            <div class="text-md font-orbit font-bold text-amber-200 flex flex-row gap-10">
-                <div>
-                    <span class="text-gray-400 font-normal text-sm">Results: </span> {{ filteredAnomalies.length ?? 0}}
-                </div>
-                <div>
-                    <span class="text-gray-400 font-normal text-sm">Selected: </span> {{ exportStore.selectedAnomalies.length ?? 0}}
-                </div>
-            </div>
+
             <div class="flex flex-row gap-0">
-                <div class="flex gap-2 p-4 items-center"> 
+                <div class="flex gap-2 pr-4 items-center"> 
                     <div class="text-sm text-gray-400 font-orbit"><p>Minimum</p><p>Confidence:</p></div>
                     <div class="relative flex items-center bg-slate-900 border border-gray-700 rounded-sm min-h-9 group outline-2 outline-transparent
                         has-[:focus]:outline-yellow-600 hover:not-has-[:focus]:outline-gray-500 focus-within:outline-yellow-600 transition-all">
@@ -167,6 +159,14 @@
                         </div>
                     </div>
                     <label class="text-md text-gray-400 font-orbit">%</label>
+                </div>
+            </div>
+            <div class="text-md font-orbit font-bold text-amber-200 flex flex-row justify-end gap-10">
+                <div>
+                    <span class="inline-block min-w-8 text-right">{{ filteredAnomalies.length ?? 0}}</span><span class="text-gray-400 font-normal text-sm"> {{ filteredAnomalies.length === 1 ? ' Result' : ' Results' }}</span> 
+                </div>
+                <div class="pr-2">
+                    <span class="inline-block min-w-8 text-right">{{ exportStore.selectedAnomalies.length ?? 0}}</span> <span class="text-gray-400 font-normal text-sm"> Selected</span> 
                 </div>
             </div>
         </div>
