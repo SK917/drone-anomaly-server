@@ -22,7 +22,7 @@ HOST = "0.0.0.0"
 PORT = 8000
 
 # MODEL_PATH = "yolo11s.pt"
-MODEL_PATH = "noMarkingsDodo.pt"
+MODEL_PATH = "yolo11s.pt"
 CONFIDENCE = 0.5
 IMG_SIZE = 480
 
@@ -326,6 +326,7 @@ async def annotation_worker():
                     
                     # Draw bounding box
                     cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
+                    cv2.circle(annotated, anomaly_det.get_center(det["bbox"]), 1, color, thickness)
                     
                     # Label with track ID if available
                     label = f"{det['class_name']} {det['confidence']*100:.1f}%"

@@ -16,12 +16,12 @@ USE_FP16 = True # Enable Half Precision
 
 # Define logic anomaly cases
 # ANOMALY_CLASSES = ["bear", "cow"]
-ANOMALY_CLASSES = ["pig", "fire", "wolf", "deer"]
+ANOMALY_CLASSES = ["pig", "fire", "wolf", "deer", "trespassing"]
 
 model = YOLO(MODEL_PATH)
 
-img = Image.open('C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Server/server/crash.jpg')
-img_array = np.array(img)
+img_array = cv2.imread('C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Server/server/person in cones.jpg')
+#img_array = np.array(img, dtype=np.uint8)
 
 results = model.track(
         img_array, 
@@ -34,11 +34,10 @@ results = model.track(
         tracker="bytetrack.yaml",
         persist=True
     )
-for result in results:
-    result.show()
+
 start = time.perf_counter()
 
-detections = anomaly_det.get_anomalies(results, ANOMALY_CLASSES, [6,6,10])
+detections = anomaly_det.get_anomalies(results, ANOMALY_CLASSES, [6,6,"cone"])
 
 end = time.perf_counter()
 print(end-start)
@@ -50,11 +49,14 @@ for det in detections:
     track_id = det.get("track_id")
     
     # Color: red for anomalies, green for normal
-    color = (0, 0, 255) if is_anomaly else (0, 255, 0)
+    color = (255, 0, 0) if is_anomaly else (0, 255, 0)
     thickness = 3 if is_anomaly else 2
     
     # Draw bounding box
     cv2.rectangle(img_array, (x1, y1), (x2, y2), color, thickness)
+    cv2.circle(img_array, anomaly_det.get_center(det["bbox"]), 1, color, thickness)
+    if "next_vector" in det:
+        cv2.line(img_array, anomaly_det.get_center(det["bbox"]), det["next_vector"], color, thickness)
     
     # Label with track ID if available
     label = f"{det['class_name']} {det['confidence']*100:.1f}%"
@@ -62,10 +64,11 @@ for det in detections:
         label = f"ID:{track_id} {label}"
     
     font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.6
+    font_scale = 0.5
     font_thickness = 2
     (label_w, label_h), baseline = cv2.getTextSize(label, font, font_scale, font_thickness)
     cv2.rectangle(img_array, (x1, y1 - label_h - 10), (x1 + label_w, y1), color, -1)
     cv2.putText(img_array, label, (x1, y1 - 5), font, font_scale, (255, 255, 255), font_thickness)
 
 plt.imshow(img_array)
+plt.show()
