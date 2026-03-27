@@ -72,11 +72,11 @@
 
 <template>
     <div class="flex flex-col h-full min-h-0  sm: pb-4 md:pb-26 ml-4 mr-4">
-        <div class="flex flex-row gap-2 items-center justify-between">
-            <div class="flex flex-row gap-2 items-center">
+        <div class="flex flex-row gap-2 items-center justify-between w-full">
+            <div class="flex flex-row gap-2 items-center flex-1">
                 <input
                     v-model="query"
-                    class="border bg-slate-900 text-gray-200 font-orbit sm:w-xs md:w-sm lg:w-lg outline-0 border-gray-700 p-2 rounded-sm focus:outline-yellow-600 focus:outline-2 hover:outline-gray-500 hover:outline-2"
+                    class="border bg-slate-900 text-gray-200 font-orbit min-w-sm flex-1 outline-0 border-gray-700 p-2 rounded-sm focus:outline-yellow-600 focus:outline-2 hover:outline-gray-500 hover:outline-2"
                     placeholder="Search by tracking ID or class name..."
                 />
                 <button
@@ -87,7 +87,7 @@
                     <Eraser :size="24"/>
                 </button>
             </div>
-            <div class="flex flex-row gap-2 items-center">
+            <div class="flex flex-row gap-2 items-center shrink-0">
                 <button 
                     @click="toggleSelectAll"
                     class="flex flex-row gap-3 items-center cursor-pointer rounded-sm p-2 text-gray-400 border border-transparent
