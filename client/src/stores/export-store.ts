@@ -1,22 +1,41 @@
 import { defineStore } from "pinia";
-import { ref, nextTick } from "vue";
+import { ref, watch, nextTick } from "vue";
 import type { Anomaly, ExportRequest } from "@/services/types.ts";
 import { exportData as exportDataService } from '@/services/export-service';
+import { useAnomaliesStore } from "./anomalies-store";
 
 export const useExportStore = defineStore("export", () => {
     const selectedAnomalies = ref<Anomaly[]>([]);
-    const exportRequest = ref<ExportRequest>({
-        current_stream_stats: true,
-        detections_summary: true,
-        stats_summary: true,
-        all_anomalies: true,
-        selected_anomalies: false,
-        no_anomalies: false,
-        is_txt: true,
-        is_json: false
-    });
+    const anomaliesStore = useAnomaliesStore();
+    const hasAutoSwitchedToAll = ref(false);
+
+    const getInitialExportState = () => {
+        const hasAnomalies = anomaliesStore.anomalies.length > 0;
+        return {
+            current_stream_stats: true,
+            detections_summary: true,
+            stats_summary: true,
+            all_anomalies: hasAnomalies,
+            selected_anomalies: false,
+            no_anomalies: !hasAnomalies,
+            is_txt: true,
+            is_json: false
+        };
+    };
+
+    const exportRequest = ref<ExportRequest>(getInitialExportState());
     const selectAllFlag = ref(false);
     const selectAllButtonFlag = ref(false);
+
+    watch(() => anomaliesStore.anomalies.length, (newCount) => {
+        if (newCount > 0 && !hasAutoSwitchedToAll.value) {
+            updateExportRequest('all_anomalies', true);
+            hasAutoSwitchedToAll.value = true;
+        } else if (newCount === 0) {
+            hasAutoSwitchedToAll.value = false;
+            updateExportRequest('no_anomalies', true);
+        }
+    });
 
     function initSelection() {
         selectedAnomalies.value = [];
@@ -24,16 +43,8 @@ export const useExportStore = defineStore("export", () => {
     }
 
     function resetExportRequest() {
-        exportRequest.value = {
-            current_stream_stats: true,
-            detections_summary: true,
-            stats_summary: true,
-            all_anomalies: true,
-            selected_anomalies: false,
-            no_anomalies: false,
-            is_txt: true,
-            is_json: false
-        };
+        exportRequest.value = getInitialExportState();
+        hasAutoSwitchedToAll.value = false;
     }
 
     function updateExportRequest(field: keyof ExportRequest, value: boolean) {
@@ -68,7 +79,7 @@ export const useExportStore = defineStore("export", () => {
         const existingIds = new Set(selectedAnomalies.value.map(a => a.track_id));
         const newEntries = anomalies.filter(a => !existingIds.has(a.track_id));
         selectedAnomalies.value = [...selectedAnomalies.value, ...newEntries];
-        selectAllFlag.value = false;  // reset first so watcher always fires
+        selectAllFlag.value = false;
         nextTick(() => {
             selectAllFlag.value = true;
             selectAllButtonFlag.value = true;
@@ -90,6 +101,7 @@ export const useExportStore = defineStore("export", () => {
         selectAllFlag,
         selectAllButtonFlag,
         exportRequest,
+        hasAutoSwitchedToAll,
         resetExportRequest,
         updateExportRequest,
         initSelection,
