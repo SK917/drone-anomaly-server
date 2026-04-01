@@ -9,71 +9,81 @@ import numpy as np
 # Outputs list of detections with is_anomaly set to true
 def get_anomalies(yolo_output, anomaly_classes, thresholds: List):
     detections: List[Dict[str, Any]] = []
+    anomaly_class_set = {anomaly.lower() for anomaly in anomaly_classes}
+    has_traffic_jam = "traffic jam" in anomaly_class_set
+    has_crowding = "crowding" in anomaly_class_set
+    has_crash = "crash" in anomaly_class_set
+    has_trespassing = "trespassing" in anomaly_class_set
+
     people_count = 0
     crowd_box = [None, None, None, None]
     vehicle_count = 0
     traffic_box = [None, None, None, None]
+    traffic_vehicles = []
+    crowd_people = []
 
     for det in yolo_output:
         names = getattr(det, "names", {})
         boxes = det.boxes
         if boxes is None:
             continue
-        
+
         for b in boxes:
             obj_class = int(b.cls[0])
             confidence = float(b.conf[0])
             x1, y1, x2, y2 = b.xyxy[0].tolist()
             class_name = names.get(obj_class, str(obj_class))
-            
+
             track_id = None
             if hasattr(b, 'id') and b.id is not None:
                 track_id = int(b.id[0])
             # Class based anomalies
-            is_anomaly = class_name.lower() in [anomaly.lower() for anomaly in anomaly_classes]
-            
-            if "Traffic Jam" in anomaly_classes:
+            is_anomaly = class_name.lower() in anomaly_class_set
+
+            if has_traffic_jam:
                 # Traffic Jam
                 if class_name == "car" or class_name == "truck":
                     vehicle_count += 1
-                    if traffic_box[0] == None: # x1
+                    traffic_vehicles.append({"track_id": track_id})
+                    if traffic_box[0] is None: # x1
                         traffic_box[0] = x1
                     elif x1 < traffic_box[0]:
                         traffic_box[0] = x1
-                    if traffic_box[1] == None: # y1
+                    if traffic_box[1] is None: # y1
                         traffic_box[1] = y1
                     elif y1 < traffic_box[1]:
                         traffic_box[1] = y1
-                    if traffic_box[2] == None: # x2
+                    if traffic_box[2] is None: # x2
                         traffic_box[2] = x2
                     elif x2 > traffic_box[2]:
                         traffic_box[2] = x2
-                    if traffic_box[3] == None: # y2
+                    if traffic_box[3] is None: # y2
                         traffic_box[3] = y2
                     elif y2 > traffic_box[3]:
                         traffic_box[3] = y2
-            
-            if "Crowding" in anomaly_classes:
+
+            if has_crowding:
                 # Crowding
                 if class_name == "person":
                     people_count += 1
-                    if crowd_box[0] == None: # x1
+                    crowd_people.append({"track_id": track_id})
+                    if crowd_box[0] is None: # x1
                         crowd_box[0] = x1
                     elif x1 < crowd_box[0]:
                         crowd_box[0] = x1
-                    if crowd_box[1] == None: # y1
+                    if crowd_box[1] is None: # y1
                         crowd_box[1] = y1
                     elif y1 < crowd_box[1]:
                         crowd_box[1] = y1
-                    if crowd_box[2] == None: # x2
+                    if crowd_box[2] is None: # x2
                         crowd_box[2] = x2
                     elif x2 > crowd_box[2]:
                         crowd_box[2] = x2
-                    if crowd_box[3] == None: # y2
+                    if crowd_box[3] is None: # y2
                         crowd_box[3] = y2
                     elif y2 > crowd_box[3]:
                         crowd_box[3] = y2
-            
+
             detections.append({
                 "class_id": obj_class,
                 "class_name": class_name,
@@ -82,32 +92,32 @@ def get_anomalies(yolo_output, anomaly_classes, thresholds: List):
                 "track_id": track_id,
                 "is_anomaly": is_anomaly
             })
-    if "Crowding" in anomaly_classes:
+    if has_crowding:
         # Crowding
         if people_count >= thresholds[0]:
             detections.append({
-                    "class_id": None,
+                    "class_id": 101,
                     "class_name": "Crowding",
                     "confidence": 1,
                     "bbox": crowd_box,
-                    "track_id": track_id,
+                    "track_id": crowd_people[0]["track_id"] + 400000 if crowd_people[0]["track_id"] is not None else None,
                     "is_anomaly": True
                 })
-    if "Traffic Jam" in anomaly_classes:
+    if has_traffic_jam:
         # Traffic Jam
         if vehicle_count >= thresholds[1]:
             detections.append({
-                    "class_id": None,
+                    "class_id": 102,
                     "class_name": "Traffic Jam",
                     "confidence": 1,
                     "bbox": traffic_box,
-                    "track_id": track_id,
+                    "track_id": traffic_vehicles[0]["track_id"] + 300000 if traffic_vehicles[0]["track_id"] is not None else None,
                     "is_anomaly": True
                 })
-    if "crash" in anomaly_classes:
+    if has_crash:
         detections = check_crashes(detections)
 
-    if "trespassing" in anomaly_classes:
+    if has_trespassing:
         detections = check_tresspassing(detections, "cone")
 
     return detections
@@ -117,7 +127,7 @@ def get_center(bbox: List[4]) -> tuple:
     x1, y1, x2, y2 = bbox
     return round((x2+x1)/2), round((y2+y1)/2)
 
-# checks the bounding boxes of cars from the input list and 
+# checks the bounding boxes of cars from the input list and
 # adds a crash entry to the detections list if cars are too close
 # together
 def check_crashes(detections: List[Dict[str, Any]]):
@@ -128,7 +138,7 @@ def check_crashes(detections: List[Dict[str, Any]]):
             vehicles.append(det)
     if not vehicles:
         return detections
-    
+
     # sort vehicles by y1 position?
     quicksortDetections(vehicles, 0, len(vehicles)-1, "bbox")
 
@@ -152,11 +162,11 @@ def check_crashes(detections: List[Dict[str, Any]]):
                     x2 = vehicles[i]["bbox"][2]
                 #print(f"crash detected. car {vehicles[i]["track_id"]}'s x1 ({vehicles[i]["bbox"][0]}) overlaps with car {vehicles[i+1]["track_id"]}'s x1 ({vehicles[i+1]["bbox"][0]}) or x2 ({vehicles[i+1]["bbox"][2]})")
                 detections.append({
-                    "class_id": None,
+                    "class_id": 103,
                     "class_name": "Crash",
                     "confidence": 1,
                     "bbox": [x1,y1,x2,y2],
-                    "track_id": None,
+                    "track_id": vehicles[i]["track_id"] + 200000 if vehicles[i]["track_id"] is not None else None,
                     "is_anomaly": True
                 })
         # compare x2 to x1 and x2
@@ -179,15 +189,15 @@ def check_crashes(detections: List[Dict[str, Any]]):
                 else:
                     x2 = vehicles[i]["bbox"][2]
                 detections.append({
-                    "class_id": None,
+                    "class_id": 103,
                     "class_name": "Crash",
                     "confidence": 1,
                     "bbox": [x1,y1,x2,y2],
-                    "track_id": None,
+                    "track_id": vehicles[i]["track_id"] + 200000 if vehicles[i]["track_id"] is not None else None,
                     "is_anomaly": True
                 })
-    
-    return detections 
+
+    return detections
 
 # takes in detections and the class label for markers.
 # computes the center point of the detected markers and organizes them into
@@ -199,7 +209,7 @@ def check_tresspassing(detections: List[Dict[str, Any]], marker_class):
         if det["class_name"] == marker_class:
             markers.append(det)
             markers[len(markers)-1]["center"] = get_center(markers[len(markers)-1]["bbox"])
-    
+
     if len(markers) == 0:
         return detections
     quicksortDetections(markers, 0, len(markers)-1, "center")
@@ -225,7 +235,7 @@ def check_tresspassing(detections: List[Dict[str, Any]], marker_class):
         temp = markers[i+1]
         markers[i+1] = markers[closest[1]]
         markers[closest[1]] = temp
-    
+
     clusters: List[List[Dict[str, Any]]] = []
 
     mean = mean/len(markers)
@@ -265,16 +275,16 @@ def check_tresspassing(detections: List[Dict[str, Any]], marker_class):
                     bbox = get_cluster_bbox(c)
                     # add a trespassing anomaly to detections
                     detections.append({
-                    "class_id": None,
+                    "class_id": 104,
                     "class_name": "trespassing",
                     "confidence": 1,
                     "bbox": bbox,
-                    "track_id": None,
+                    "track_id": det["track_id"]+100000,
                     "is_anomaly": True
                 })
-    
+
     return detections
-    
+
 
 def get_cluster_bbox(cluster: List[Dict[str, Any]]) -> List[4]:
     x1 = 9999999
@@ -296,8 +306,8 @@ def quicksortDetections(detections, low, high, sortMetric):
     v = []
     if low < high:
         pi = partition(detections, low, high, sortMetric)
-        quicksortDetections(detections, pi+1, high, sortMetric) 
-        quicksortDetections(detections, low, pi-1, sortMetric)     
+        quicksortDetections(detections, pi+1, high, sortMetric)
+        quicksortDetections(detections, low, pi-1, sortMetric)
 
 def partition(detections, low, high, sortMetric):
     if sortMetric == "bbox":
@@ -321,4 +331,3 @@ def partition(detections, low, high, sortMetric):
 
 def swap(detections, i, j):
     detections[i], detections[j] = detections[j], detections[i]
-

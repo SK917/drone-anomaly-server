@@ -22,15 +22,31 @@ HOST = "0.0.0.0"
 PORT = 8000
 
 # MODEL_PATH = "yolo11s.pt"
-MODEL_PATH = "noMarkingsDodo.pt"
+# MODEL_PATH = "noMarkingsDodo.pt"
+MODEL_PATH = "newestModel.pt"
 CONFIDENCE = 0.5
 IMG_SIZE = 480
+LOG_EVERY_N_INFERENCES = 10
 
 USE_FP16 = True # Enable Half Precision
 
 # Define logic anomaly cases
 # ANOMALY_CLASSES = ["bear", "cow"]
-ANOMALY_CLASSES = ["pig", "fire", "wolf", "deer"]
+ANOMALY_CLASSES = ["pig", "fire", "wolf", "deer", "traffic jam", "crowding", "trespassing", "crash" ]
+
+# Bounding box size limits (width/height in pixels, tuned for BBOX_SCALE_REFERENCE resolution)
+BBOX_SCALE_REFERENCE = 480
+GENERIC_MAX_BBOX = {"max_w": 80, "max_h": 80}
+BBOX_SIZE_LIMITS = {
+    "car": {"min_w": 8, "min_h": 6, "max_w": 70, "max_h": 50},
+    "police_car": {"min_w": 8, "min_h": 6, "max_w": 70, "max_h": 50},
+    "person": {"min_w": 3, "min_h": 6, "max_w": 30, "max_h": 60},
+    "wolf": {"min_w": 5, "min_h": 4, "max_w": 50, "max_h": 40},
+    "pig": {"min_w": 5, "min_h": 4, "max_w": 40, "max_h": 35},
+    "deer": {"min_w": 5, "min_h": 5, "max_w": 55, "max_h": 55},
+    "fire": {"min_w": None, "min_h": None, "max_w": 80, "max_h": 80},
+    "cone": {"min_w": 2, "min_h": 3, "max_w": 20, "max_h": 30},
+}
 
 # WebRTC state
 pc: Optional[aiortc.RTCPeerConnection] = None
@@ -47,6 +63,7 @@ detections_lock = asyncio.Lock()
 
 # Anomalies list
 anomalies_list: List[Dict[str, Any]] = []
+anomalies_by_track_id: Dict[int, Dict[str, Any]] = {}
 seen_anomaly_ids: set[int] = set()
 anomalies_lock = asyncio.Lock()
 anomaly_update_pending: bool = False
@@ -82,27 +99,66 @@ class ConnectionManager:
         if not self.active_connections:
             print("[SESSION] Last client disconnected. Clearing anomaly logs.")
             anomalies_list.clear()
+            anomalies_by_track_id.clear()
             seen_anomaly_ids.clear()
 
     async def broadcast(self, message: dict):
+        stale_connections: List[WebSocket] = []
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
             except Exception:
-                # Remove stale connections
-                self.active_connections.remove(connection)
+                stale_connections.append(connection)
 
+        for connection in stale_connections:
+            if connection in self.active_connections:
+                self.active_connections.remove(connection)
 manager = ConnectionManager()
+
+# def filter_invalid_bboxes(results, img_size: int):
+#     scale = img_size / BBOX_SCALE_REFERENCE
+#     for det in results:
+#         names = getattr(det, "names", {})
+#         boxes = det.boxes
+#         if boxes is None:
+#             continue
+#         keep = []
+#         for i, b in enumerate(boxes):
+#             x1, y1, x2, y2 = b.xyxy[0].tolist()
+#             w = x2 - x1
+#             h = y2 - y1
+#             class_name = names.get(int(b.cls[0]), str(int(b.cls[0])))
+#             limits = BBOX_SIZE_LIMITS.get(class_name)
+#             if limits is not None:
+#                 max_w = limits["max_w"] * scale
+#                 max_h = limits["max_h"] * scale
+#                 if w > max_w or h > max_h:
+#                     continue
+#                 min_w = limits["min_w"]
+#                 min_h = limits["min_h"]
+#                 if min_w is not None and w < min_w * scale:
+#                     continue
+#                 if min_h is not None and h < min_h * scale:
+#                     continue
+#             else:
+#                 max_w = GENERIC_MAX_BBOX["max_w"] * scale
+#                 max_h = GENERIC_MAX_BBOX["max_h"] * scale
+#                 if w > max_w or h > max_h:
+#                     continue
+#             keep.append(i)
+#         if len(keep) < len(boxes):
+#             det.boxes = boxes[keep]
+#     return results
 
 # YOLO Inference with ByteTrack for Tracking
 # Use ultralytics built in tracking support with the bytetrack algorithm for stable fps
 def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], float]:
     t0 = time.time()
     results = model.track(
-        frame_bgr, 
-        imgsz=IMG_SIZE, 
-        conf=CONFIDENCE, 
-        device=device, 
+        frame_bgr,
+        imgsz=IMG_SIZE,
+        conf=CONFIDENCE,
+        device=device,
         verbose=False,
         half=USE_FP16,
         agnostic_nms=True,
@@ -111,33 +167,7 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
     )
     infms = (time.time() - t0) * 1000.0
 
-    '''
-    detections: List[Dict[str, Any]] = []
-    for det in results:
-        names = getattr(det, "names", {})
-        boxes = det.boxes
-        if boxes is None:
-            continue
-        
-        for b in boxes:
-            obj_class = int(b.cls[0])
-            confidence = float(b.conf[0])
-            x1, y1, x2, y2 = b.xyxy[0].tolist()
-            class_name = names.get(obj_class, str(obj_class))
-            
-            track_id = None
-            if hasattr(b, 'id') and b.id is not None:
-                track_id = int(b.id[0])
-            
-            detections.append({
-                "class_id": obj_class,
-                "class_name": class_name,
-                "confidence": confidence,
-                "bbox": [x1, y1, x2, y2],
-                "track_id": track_id,
-                "is_anomaly": class_name.lower() in [anomaly.lower() for anomaly in ANOMALY_CLASSES]
-            })
-      '''
+    # results = filter_invalid_bboxes(results, IMG_SIZE)
     detections = anomaly_det.get_anomalies(results, ANOMALY_CLASSES, [8,8,1])
     return detections, infms
 
@@ -149,28 +179,28 @@ async def inference_worker():
     """
     global inference_count, inference_start_time, last_inference_time, inference_fps
     global current_detections, is_inferencing
-    
+
     print("[INFERENCE] Worker started - waiting for video stream...")
-    
+
     try:
         while not stop_event.is_set():
             await asyncio.sleep(0.001)  # Small sleep to prevent busy-wait
-            
+
             # Wait for stream
             if ingest_video_track is None:
                 await asyncio.sleep(0.1)
                 continue
-            
+
             # Skip if already processing (prevents concurrent inference)
             if is_inferencing:
                 continue
-            
+
             is_inferencing = True
-            
+
             try:
                 latest_frame = None
                 frames_drained = 0
-                
+
                 while True:
                     try:
                         # Attempt to grab the most recent frame from the buffer
@@ -179,37 +209,36 @@ async def inference_worker():
                         frames_drained += 1
                     except asyncio.TimeoutError:
                         break
-                
+
                 if latest_frame is None:
                     is_inferencing = False
                     continue
-                
-                if frames_drained > 1:
+
+                if frames_drained > 1 and inference_count % LOG_EVERY_N_INFERENCES == 0:
                     print(f"[BUFFER] Drained {frames_drained} frames")
-                
+
                 img = latest_frame.to_ndarray(format="bgr24")
-                
+
                 # Run YOLO in a thread to keep the event loop responsive
                 detections, infer_ms = await asyncio.to_thread(_run_yolo_on_frame, img)
-                
+
                 inference_count += 1
                 current_time = time.time()
-                
+
                 if inference_start_time is None:
                     inference_start_time = current_time
-                
+
                 elapsed = current_time - inference_start_time
                 inference_fps = inference_count / elapsed if elapsed > 0 else 0.0
                 last_inference_time = current_time
-                
+
                 # Store detections and raw frame for annotation
-                async with detections_lock:
-                    current_detections = detections
-                
                 global latest_raw_frame
                 async with annotated_frame_lock:
-                    latest_raw_frame = img.copy()
-                
+                  latest_raw_frame = img
+                  async with detections_lock:
+                    current_detections = detections
+
                 # Log results
                 anomalies = [d for d in detections if d.get('is_anomaly', False)]
 
@@ -218,15 +247,15 @@ async def inference_worker():
                 if manager.active_connections:
                     added_entries: List[Dict[str, Any]] = []
                     updated_entries: List[Dict[str, Any]] = []
-                    
+
                     async with anomalies_lock:
                         for det in anomalies:
                             track_id = det.get("track_id")
                             if track_id is None:
                                 continue
-                            
+
                             # Look for an existing record of this specific track
-                            existing_entry = next((a for a in anomalies_list if a["track_id"] == track_id), None)
+                            existing_entry = anomalies_by_track_id.get(track_id)
 
                             if existing_entry is None:
                                 # New anomaly: Add to list and seen set
@@ -234,8 +263,9 @@ async def inference_worker():
                                 new_entry = det.copy()
                                 new_entry["timestamp"] = time.time()
                                 anomalies_list.append(new_entry)
+                                anomalies_by_track_id[track_id] = new_entry
                                 added_entries.append(new_entry)
-                            
+
                             elif det["confidence"] > existing_entry["confidence"]:
                                 # Existing anomaly, but better confidence: Update the record
                                 existing_entry["confidence"] = det["confidence"]
@@ -265,17 +295,17 @@ async def inference_worker():
                         seen_anomaly_ids.clear()
                         async with anomalies_lock:
                             anomalies_list.clear()
-
-                if detections:
+                            anomalies_by_track_id.clear()
+                if detections and inference_count % LOG_EVERY_N_INFERENCES == 0:
                     print(f"\n[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - Found {len(detections)} object(s) ({infer_ms:.1f}ms):")
                     for i, d in enumerate(detections, 1):
                         print(f"  {i}. {d['class_name']} ({d['confidence']*100:.1f}%)")
-                else:
+                elif not detections and inference_count % LOG_EVERY_N_INFERENCES == 0:
                     print(f"[INFERENCE #{inference_count}] @ {inference_fps:.1f} FPS - No objects detected ({infer_ms:.1f}ms)")
-                
+
                 if anomalies:
                     print(f"ANOMALY: {', '.join([a['class_name'] for a in anomalies])}")
-            
+
             except asyncio.TimeoutError:
                 print("[INFERENCE] Timeout waiting for frame")
             except Exception as e:
@@ -292,47 +322,48 @@ async def inference_worker():
 # Annotation Worker - Draws bounding boxes
 async def annotation_worker():
     global latest_annotated_jpeg
-    
+
     print("[ANNOTATION] Worker started - waiting for frames...")
 
     frame_counter = 0
-    
+
     try:
         while not stop_event.is_set():
             await asyncio.sleep(0.05) # ~20 FPS
-            
+
             # Get current frame and detections
             async with annotated_frame_lock:
                 frame = latest_raw_frame
-            
-            async with detections_lock:
-                detections_copy = current_detections.copy()
-            
+                async with detections_lock:
+                    detections_copy = current_detections.copy()
+
             if frame is None:
                 continue
-            
+
             try:
                 annotated = frame.copy()
-                
+
                 # Draw each detection
                 for det in detections_copy:
                     x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
                     is_anomaly = det.get("is_anomaly", False)
                     track_id = det.get("track_id")
-                    
+
                     # Color: red for anomalies, green for normal
                     color = (0, 0, 255) if is_anomaly else (0, 255, 0)
                     thickness = 3 if is_anomaly else 2
-                    
+
                     # Draw bounding box
                     cv2.rectangle(annotated, (x1, y1), (x2, y2), color, thickness)
                     cv2.circle(annotated, anomaly_det.get_center(det["bbox"]), 1, color, thickness)
-                    
+                    if "next_vector" in det:
+                        cv2.line(annotated, anomaly_det.get_center(det["bbox"]), det["next_vector"], color, thickness)
+
                     # Label with track ID if available
                     label = f"{det['class_name']} {det['confidence']*100:.1f}%"
                     if track_id is not None:
                         label = f"ID:{track_id} {label}"
-                    
+
                     font = cv2.FONT_HERSHEY_SIMPLEX
                     font_scale = 0.6
                     font_thickness = 2
@@ -345,7 +376,7 @@ async def annotation_worker():
                 if ret:
                     async with annotated_frame_lock:
                         latest_annotated_jpeg = buffer.tobytes()
-                    
+
                     if manager.active_connections:
                         frame_counter += 1
                         if frame_counter % 2 == 0:
@@ -353,7 +384,7 @@ async def annotation_worker():
                         if frame_counter >= 4:
                             global anomaly_update_pending, anomaly_delta
                             anomalies_snapshot = [d for d in detections_copy if d.get('is_anomaly', False)]
-                            
+
                             # Detections and stats socket update
                             await manager.broadcast({
                                 "type": "NEW_DATA",
@@ -371,17 +402,17 @@ async def annotation_worker():
                                     "is_processing": is_inferencing
                                 }
                             })
-                            
+
                             # Anomalies socket update
                             if anomaly_update_pending:
                                 await manager.broadcast({"type": "NEW_ANOMALY", "delta": anomaly_delta})
                                 anomaly_update_pending = False
                                 anomaly_delta = {"added": [], "updated": []}
-                            
+
                             frame_counter = 0
                 else:
                     print("[ANNOTATION] Failed to encode JPEG")
-            
+
             except Exception as e:
                 print(f"[ANNOTATION] Error during processing: {type(e).__name__}: {str(e)}")
 
@@ -393,9 +424,9 @@ async def annotation_worker():
 async def lifespan(app: FastAPI):
     # --- STARTUP ---
     global model, device
-    
+
     print("[STARTUP] Pure Inference Server starting...")
-    
+
     # Setup GPU
     if torch.cuda.is_available():
         device = "cuda"
@@ -406,14 +437,14 @@ async def lifespan(app: FastAPI):
     else:
         device = "cpu"
         print("[WARNING] CUDA not available, using CPU")
-    
+
     torch.set_grad_enabled(False)
-    
+
     # Load YOLO model
     print(f"[MODEL] Loading {MODEL_PATH}...")
     model = await asyncio.to_thread(YOLO, MODEL_PATH)
     await asyncio.to_thread(model.to, device)
-    
+
     # GPU warmup
     if device == "cuda":
         print("[MODEL] Warming up GPU...")
@@ -421,13 +452,13 @@ async def lifespan(app: FastAPI):
         for _ in range(3):
             _ = model(dummy_frame, imgsz=IMG_SIZE, device=device, verbose=False, half=USE_FP16)
         torch.cuda.synchronize()
-    
+
     print(f"Model loaded on {device.upper()} with FP16={USE_FP16}")
-    
+
     # Create tasks and store them so we can cancel them later
     inf_task = asyncio.create_task(inference_worker())
     ann_task = asyncio.create_task(annotation_worker())
-    
+
     print(f"Server ready: http://localhost:{PORT}")
     print(f"Detection Stats: http://localhost:{PORT}/")
     print(f"Live Video View: http://localhost:{PORT}/video-view")
@@ -439,22 +470,22 @@ async def lifespan(app: FastAPI):
     # --- SHUTDOWN ---
     global pc
     print("[SHUTDOWN] Cleaning up resources...")
-    
+
     # 1. Signal and cancel background workers
     stop_event.set()
     inf_task.cancel()
     ann_task.cancel()
-    
+
     # Wait for workers to acknowledge cancellation
     await asyncio.gather(inf_task, ann_task, return_exceptions=True)
-    
+
     # 2. Close all WebSocket connections
     for ws in manager.active_connections:
         try:
             await ws.close()
         except:
             pass
-    
+
     # 3. Close WebRTC connection
     if pc:
         print("[SHUTDOWN] Closing WebRTC peer connection...")
@@ -473,7 +504,7 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "*", 
+        "*",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -540,7 +571,7 @@ async def get_detections():
             "has_anomaly": len(anomalies) > 0,
             "anomaly_count": len(anomalies)
         }
-    
+
 # Endpoint for anomaly search data
 @app.get("/anomalies")
 async def get_anomalies():
@@ -581,7 +612,7 @@ async def get_annotated_frame():
         if latest_annotated_jpeg is None:
             raise HTTPException(status_code=404, detail="No annotated frame available yet")
         updated_jpeg = latest_annotated_jpeg
-    
+
     return Response(content=updated_jpeg, media_type="image/jpeg")
 
 @app.websocket("/updates")
@@ -589,7 +620,7 @@ async def websocket_updates(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while not stop_event.is_set():
-          await asyncio.sleep(5)
+            await websocket.receive_text()
     except (WebSocketDisconnect, asyncio.CancelledError):
         manager.disconnect(websocket)
     finally:
@@ -689,9 +720,9 @@ async def video_view():
     <div class="container">
       <h1>Live Detection Video Stream</h1>
       <p class="info">Real-time YOLO Object Detection with Bounding Boxes</p>
-      
+
       <div id="anomalyWarning" class="anomaly-warning"></div>
-      
+
       <div class="stats">
         <div class="stat-box">
           <div class="stat-label">Inferences</div>
@@ -706,18 +737,18 @@ async def video_view():
           <div class="stat-value" id="objectCount">0</div>
         </div>
       </div>
-      
+
       <div class="video-container">
         <img id="videoFrame" src="/annotated-frame.jpg" alt="Waiting for stream..." onload="scheduleNextFrame()">
       </div>
-      
+
       <p class="info">Green boxes: Normal objects | Red boxes: Anomalies ({{', '.join(ANOMALY_CLASSES)}})</p>
     </div>
-    
+
     <script>
       const img = document.getElementById('videoFrame');
       let frameNumber = 0;
-      
+
       // Refresh video frame using onload callback for smoother updates
       function scheduleNextFrame() {{
         frameNumber++;
@@ -726,22 +757,22 @@ async def video_view():
           img.src = `/annotated-frame.jpg?frame=${{frameNumber}}`;
         }}, 16);  // ~60 FPS max
       }}
-      
+
       // Initial load
       scheduleNextFrame();
       // Initial load
       scheduleNextFrame();
-      
+
       // Update stats
       async function updateStats() {{
         try {{
           const response = await fetch('/detections');
           const data = await response.json();
-          
+
           document.getElementById('inferenceCount').textContent = data.inference_count || 0;
           document.getElementById('inferenceFps').textContent = (data.inference_fps || 0).toFixed(1);
           document.getElementById('objectCount').textContent = data.num_detections || 0;
-          
+
           // Show anomaly warning
           const warning = document.getElementById('anomalyWarning');
           if (data.has_anomaly && data.detections) {{
@@ -756,7 +787,7 @@ async def video_view():
           console.error('Error fetching stats:', error);
         }}
       }}
-      
+
       // Update stats every 200ms
       setInterval(updateStats, 200);
       updateStats();
@@ -897,13 +928,13 @@ def index():
   </head>
   <body>
     <div class="container">
-      <h1>🎯 Pure Inference Server</h1>
-      <p style="text-align: center; opacity: 0.8;">Real-time YOLO Detection • Port {PORT}</p>
-      
+      <h1>ðŸŽ¯ Pure Inference Server</h1>
+      <p style="text-align: center; opacity: 0.8;">Real-time YOLO Detection â€¢ Port {PORT}</p>
+
       <div class="stream-status" id="streamStatus">
         <span id="streamText">Waiting for stream...</span>
       </div>
-      
+
       <div class="stats">
         <div class="stat-row">
           <div class="stat-box">
@@ -920,9 +951,9 @@ def index():
           </div>
         </div>
       </div>
-      
+
       <div id="anomalyWarningContainer"></div>
-      
+
       <div class="detections-container">
         <h2 style="margin-top: 0;">Detected Objects</h2>
         <div id="detectionsList">
@@ -930,31 +961,31 @@ def index():
         </div>
       </div>
     </div>
-    
+
     <script>
       let lastDetectionCount = 0;
-      
+
       async function updateDetections() {{
         try {{
           const response = await fetch('/detections');
           const data = await response.json();
-          
+
           // Update stats
           document.getElementById('inferenceCount').textContent = data.inference_count || 0;
           document.getElementById('inferenceFps').textContent = (data.inference_fps || 0).toFixed(1);
           document.getElementById('objectCount').textContent = data.num_detections || 0;
-          
+
           // Update stream status
           const streamStatus = document.getElementById('streamStatus');
           const streamText = document.getElementById('streamText');
           if (data.inference_count > 0) {{
             streamStatus.className = 'stream-status stream-active';
-            streamText.textContent = '✓ Stream Active - Processing';
+            streamText.textContent = 'âœ“ Stream Active - Processing';
           }} else {{
             streamStatus.className = 'stream-status stream-inactive';
             streamText.textContent = 'Waiting for stream...';
           }}
-          
+
           // Update anomaly warning
           const anomalyContainer = document.getElementById('anomalyWarningContainer');
           if (data.has_anomaly) {{
@@ -968,7 +999,7 @@ def index():
           }} else {{
             anomalyContainer.innerHTML = '';
           }}
-          
+
           // Update detections list
           const detectionsList = document.getElementById('detectionsList');
           if (data.detections && data.detections.length > 0) {{
@@ -985,13 +1016,13 @@ def index():
                 uniqueObjects[key].confidence = Math.max(uniqueObjects[key].confidence, det.confidence);
               }}
             }});
-            
+
             detectionsList.innerHTML = Object.values(uniqueObjects)
               .sort((a, b) => b.confidence - a.confidence)
               .map(det => {{
                 const anomalyClass = det.is_anomaly ? ' anomaly' : '';
                 const anomalyIcon = det.is_anomaly ? '!' : '';
-                const countText = det.count > 1 ? ` (×${{det.count}})` : '';
+                const countText = det.count > 1 ? ` (Ã—${{det.count}})` : '';
                 return `
                   <div class="detection-item${{anomalyClass}}">
                     <span class="detection-name">${{det.class_name.toUpperCase()}}${{countText}}${{anomalyIcon}}</span>
@@ -1002,12 +1033,12 @@ def index():
           }} else {{
             detectionsList.innerHTML = '<div class="no-detections">No objects detected</div>';
           }}
-          
+
         }} catch (error) {{
           console.error('Error fetching detections:', error);
         }}
       }}
-      
+
       // Update every 100ms for responsive UI
       setInterval(updateDetections, 100);
       updateDetections();
