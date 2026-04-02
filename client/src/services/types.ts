@@ -39,6 +39,11 @@ export interface ClassItem {
     class_name: string
 }
 
+export interface SelectionClassItem extends ClassItem {
+    suggested_as_anomaly: boolean
+    selected: boolean
+}
+
 export interface FrequencyItem {
     class_id: number;
     class_name: string;

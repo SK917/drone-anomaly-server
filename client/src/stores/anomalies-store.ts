@@ -2,16 +2,18 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { getAnomalies } from "@/services/anomalies-service";
 import { useDetectionsStore } from "./detections-store";
-import type { Anomaly, ClassItem } from "@/services/types.ts";
+import type { Anomaly, ClassItem, SelectionClassItem } from "@/services/types.ts";
 
 export const useAnomaliesStore = defineStore("anomalies", () => {
     const detectionsStore = useDetectionsStore();
     const anomalyList = ref<Anomaly[]>([]);
     const loading = ref(false);
     const error = ref<string | null>(null);
+    const selectedClasses = ref<SelectionClassItem[]>([]);
 
     // Initial load on connect
     async function fetchAnomalies() {
+        initClassConfig();
         loading.value = true;
         error.value = null;
         try {
@@ -66,10 +68,96 @@ export const useAnomaliesStore = defineStore("anomalies", () => {
         return Object.values(classMap);
     });
 
+    function updateClassSelectStatus(id: number) {
+        const item = selectedClasses.value.find(s => s.class_id === id);
+        if (item) {
+            item.selected = !item.selected;
+        }
+    }
+
+    function initClassConfig() {
+        selectedClasses.value = [
+            {
+                class_id: 0,
+                class_name: "car",
+                suggested_as_anomaly: false,
+                selected: false
+            },
+            {
+                class_id: 1,
+                class_name: "cone",
+                suggested_as_anomaly: false,
+                selected: false
+            },
+            {
+                class_id: 2,
+                class_name: "deer",
+                suggested_as_anomaly: true,
+                selected: true
+            },
+            {
+                class_id: 3,
+                class_name: "fire",
+                suggested_as_anomaly: true,
+                selected: true
+            },
+            {
+                class_id: 4,
+                class_name: "person",
+                suggested_as_anomaly: false,
+                selected: false
+            },
+            {
+                class_id: 5,
+                class_name: "pig",
+                suggested_as_anomaly: true,
+                selected: true
+            },
+            {
+                class_id: 6,
+                class_name: "police_car",
+                suggested_as_anomaly: false,
+                selected: false
+            },
+            {
+                class_id: 7,
+                class_name: "wolf",
+                suggested_as_anomaly: true,
+                selected: true
+            },
+            {
+                class_id: 101,
+                class_name: "Crowding",
+                suggested_as_anomaly: true,
+                selected: true
+            },
+            {
+                class_id: 102,
+                class_name: "Traffic Jam",
+                suggested_as_anomaly: true,
+                selected: true
+            },
+            {
+                class_id: 103,
+                class_name: "Crash",
+                suggested_as_anomaly: true,
+                selected: true
+            },
+            {
+                class_id: 104,
+                class_name: "trespassing",
+                suggested_as_anomaly: true,
+                selected: true
+            }
+        ]
+    }
+
     return {
         fetchAnomalies,
         applyDelta,
         resetAnomalies,
+        updateClassSelectStatus,
+        selectedClasses,
         count,
         classes,
         anomalies,

@@ -419,6 +419,22 @@ async def annotation_worker():
     except asyncio.CancelledError:
         print("[ANNOTATION] Worker received stop signal. Cleaning up...")
 
+# Handle incoming socket messages
+async def handle_client_message(message: dict):
+    global ANOMALY_CLASSES
+    msg_type = message.get("type")
+    
+    # Updates anomaly class list
+    if msg_type == "UPDATE_ANOMALY_CLASSES":
+        new_classes = message.get("classes", [])
+        if isinstance(new_classes, list) and all(isinstance(c, str) for c in new_classes):
+            ANOMALY_CLASSES = new_classes
+            # Clear existing anomaly data since class list changed
+            async with anomalies_lock:
+                anomalies_list.clear()
+                seen_anomaly_ids.clear()
+            print(f"[CONFIG] Anomaly classes updated: {ANOMALY_CLASSES}")
+
 # Server Startup / Shutdown Process
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -620,7 +636,13 @@ async def websocket_updates(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while not stop_event.is_set():
-            await websocket.receive_text()
+            try:
+                message = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
+                await handle_client_message(message)
+            except asyncio.TimeoutError:
+                continue
+            except Exception:
+                break
     except (WebSocketDisconnect, asyncio.CancelledError):
         manager.disconnect(websocket)
     finally:

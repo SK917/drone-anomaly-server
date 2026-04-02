@@ -6,12 +6,14 @@
     import { useAnalyticsStore } from '@/stores/analytics-store';
     import { useAnomaliesStore } from '@/stores/anomalies-store';
     import { useExportStore } from '@/stores/export-store';
+    import { useSocketStore } from '@/stores/socket-store';
     import type { DetectionsResponse, StatsResponse } from '@/services/types';
     import StreamInfo from '@/components/StreamInfo.vue';
     import VideoFeed from '@/components/VideoFeed.vue';
     import DetectionsList from '@/components/DetectionsList.vue';
     import AnalyticsList from '@/components/AnalyticsList.vue';
     import Search from '@/components/Search.vue';
+    import Settings from '@/components/Settings.vue';
     import DevInfo from '@/components/DevInfo.vue';
 
     const detectionsStore = useDetectionsStore();
@@ -20,47 +22,49 @@
     const analyticsStore = useAnalyticsStore();
     const anomaliesStore = useAnomaliesStore();
     const exportStore = useExportStore();
-
-    const socket = ref<WebSocket | null>(null);
+    const socketStore = useSocketStore();
 
     onMounted(() => {
-        socket.value = new WebSocket("ws://localhost:8000/updates");
+        socketStore.socket = new WebSocket("ws://localhost:8000/updates");
         exportStore.initSelection();
+        const s = socketStore.socket;
 
-        socket.value.onopen = () => {
-            console.log("Connected to Drone Inference Server");
-            anomaliesStore.fetchAnomalies();
-        };
+        if (s) {
+            s.onopen = () => {
+                console.log("Connected to Drone Inference Server");
+                anomaliesStore.fetchAnomalies();
+            };
 
-        socket.value.onmessage = (event) => {
-            const msg = JSON.parse(event.data);
-            switch (msg.type) {
-                case "NEW_FRAME":
-                    framesStore.getNewFrame();
-                    break;
+            s.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                switch (msg.type) {
+                    case "NEW_FRAME":
+                        framesStore.getNewFrame();
+                        break;
 
-                case "NEW_DATA":
-                    detectionsStore.applyData({
-                        timestamp: msg.timestamp,
-                        num_detections: msg.num_detections,
-                        detections: msg.detections,
-                        inference_count: msg.inference_count,
-                        inference_fps: msg.inference_fps,
-                        has_anomaly: msg.has_anomaly,
-                        anomaly_count: msg.anomaly_count,
-                    } as DetectionsResponse);
-                    statsStore.applyData(msg.stats as StatsResponse);
-                    break;
+                    case "NEW_DATA":
+                        detectionsStore.applyData({
+                            timestamp: msg.timestamp,
+                            num_detections: msg.num_detections,
+                            detections: msg.detections,
+                            inference_count: msg.inference_count,
+                            inference_fps: msg.inference_fps,
+                            has_anomaly: msg.has_anomaly,
+                            anomaly_count: msg.anomaly_count,
+                        } as DetectionsResponse);
+                        statsStore.applyData(msg.stats as StatsResponse);
+                        break;
 
-                case "NEW_ANOMALY":
-                    console.log('Delta:', msg.delta)
-                    anomaliesStore.applyDelta(msg.delta);
-                    break;
-            }
-        };
+                    case "NEW_ANOMALY":
+                        console.log('Delta:', msg.delta);
+                        anomaliesStore.applyDelta(msg.delta);
+                        break;
+                }
+            };
 
-        socket.value.onerror = (error) => console.error("Socket Error:", error);
-        socket.value.onclose = () => console.log("Socket Closed");
+            s.onerror = (error) => console.error("Socket Error:", error);
+            s.onclose = () => console.log("Socket Closed");
+        }
     });
 
     watch(
@@ -72,11 +76,12 @@
     );
 
     onUnmounted(() => {
-        if (socket.value) {
+        if (socketStore.socket) {
             detectionsStore.resetCounts();
             analyticsStore.resetAnalytics();
             anomaliesStore.resetAnomalies();
-            socket.value.close();
+            socketStore.socket.close();
+            socketStore.socket = null;
         }
     });
 </script>
@@ -88,6 +93,7 @@
         <StreamInfo/>
         <VideoFeed/>
         <AnalyticsList/>
+        <Settings/>
     </div>
     
     <div class="flex flex-col gap-6 bg-slate-950 flex-1 min-w-0 h-screen max-h-screen overflow-hidden">
