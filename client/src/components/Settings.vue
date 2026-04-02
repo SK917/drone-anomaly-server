@@ -46,7 +46,7 @@
 <template>
     <button 
         @click="toggleSettingsPopup"
-        class="flex flex-row gap-3 w-45 items-center cursor-pointer bg-gray-800 rounded-sm p-2 text-gray-400 border border-transparent
+        class="flex flex-row gap-3 w-42 items-center cursor-pointer bg-gray-800 rounded-sm p-2 text-gray-400 border border-transparent
         hover:border-yellow-600 hover:text-white font-orbit text-xs"
     >
         <Settings :size=20 class="text-amber-200"/>

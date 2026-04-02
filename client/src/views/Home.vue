@@ -14,6 +14,7 @@
     import AnalyticsList from '@/components/AnalyticsList.vue';
     import Search from '@/components/Search.vue';
     import Settings from '@/components/Settings.vue';
+    import Reset from '@/components/Reset.vue';
     import DevInfo from '@/components/DevInfo.vue';
 
     const detectionsStore = useDetectionsStore();
@@ -89,11 +90,15 @@
 <template>
   <div class="flex flex-col md:flex-row gap-6 md:h-screen md:overflow-hidden bg-slate-900">
     
-    <div class="flex flex-col gap-6 md:basis-[42%] shrink-0 p-4 min-w-0 md:overflow-y-auto detections-scroll">
+    <div class="flex flex-col gap-2 justify-between md:basis-[42%] shrink-0 p-4 min-w-0 md:overflow-y-auto detections-scroll">
         <StreamInfo/>
         <VideoFeed/>
         <AnalyticsList/>
-        <Settings/>
+        <div class="flex flex-row gap-2">
+            <Reset/>
+            <Settings/>
+        </div>
+        
     </div>
     
     <div class="flex flex-col gap-6 bg-slate-950 flex-1 min-w-0 h-screen max-h-screen overflow-hidden">

@@ -434,6 +434,12 @@ async def handle_client_message(message: dict):
                 anomalies_list.clear()
                 seen_anomaly_ids.clear()
             print(f"[CONFIG] Anomaly classes updated: {ANOMALY_CLASSES}")
+    if msg_type == "RESET":
+        async with anomalies_lock:
+            anomalies_list.clear()
+            seen_anomaly_ids.clear()
+        print(f"[UPDATE] Data reset!")
+
 
 # Server Startup / Shutdown Process
 @asynccontextmanager

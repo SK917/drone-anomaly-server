@@ -44,7 +44,7 @@ def get_anomalies(yolo_output, anomaly_classes, thresholds: List):
                 # Traffic Jam
                 if class_name == "car" or class_name == "truck":
                     vehicle_count += 1
-                    traffic_vehicles.append({"track_id": track_id})
+                    traffic_vehicles.append({"track_id": track_id, "confidence": confidence})
                     if traffic_box[0] is None: # x1
                         traffic_box[0] = x1
                     elif x1 < traffic_box[0]:
@@ -66,7 +66,7 @@ def get_anomalies(yolo_output, anomaly_classes, thresholds: List):
                 # Crowding
                 if class_name == "person":
                     people_count += 1
-                    crowd_people.append({"track_id": track_id})
+                    crowd_people.append({"track_id": track_id, "confidence": confidence})
                     if crowd_box[0] is None: # x1
                         crowd_box[0] = x1
                     elif x1 < crowd_box[0]:
@@ -95,10 +95,11 @@ def get_anomalies(yolo_output, anomaly_classes, thresholds: List):
     if has_crowding:
         # Crowding
         if people_count >= thresholds[0]:
+            avg_confidence = sum(p["confidence"] for p in crowd_people) / len(crowd_people)
             detections.append({
                     "class_id": 101,
                     "class_name": "Crowding",
-                    "confidence": 1,
+                    "confidence": avg_confidence,
                     "bbox": crowd_box,
                     "track_id": crowd_people[0]["track_id"] + 400000 if crowd_people[0]["track_id"] is not None else None,
                     "is_anomaly": True
@@ -106,10 +107,11 @@ def get_anomalies(yolo_output, anomaly_classes, thresholds: List):
     if has_traffic_jam:
         # Traffic Jam
         if vehicle_count >= thresholds[1]:
+            avg_confidence = sum(v["confidence"] for v in traffic_vehicles) / len(traffic_vehicles)
             detections.append({
                     "class_id": 102,
                     "class_name": "Traffic Jam",
-                    "confidence": 1,
+                    "confidence": avg_confidence,
                     "bbox": traffic_box,
                     "track_id": traffic_vehicles[0]["track_id"] + 300000 if traffic_vehicles[0]["track_id"] is not None else None,
                     "is_anomaly": True
@@ -161,10 +163,11 @@ def check_crashes(detections: List[Dict[str, Any]]):
                 else:
                     x2 = vehicles[i]["bbox"][2]
                 #print(f"crash detected. car {vehicles[i]["track_id"]}'s x1 ({vehicles[i]["bbox"][0]}) overlaps with car {vehicles[i+1]["track_id"]}'s x1 ({vehicles[i+1]["bbox"][0]}) or x2 ({vehicles[i+1]["bbox"][2]})")
+                avg_confidence = (vehicles[i]["confidence"] + vehicles[i+1]["confidence"]) / 2
                 detections.append({
                     "class_id": 103,
                     "class_name": "Crash",
-                    "confidence": 1,
+                    "confidence": avg_confidence,
                     "bbox": [x1,y1,x2,y2],
                     "track_id": vehicles[i]["track_id"] + 200000 if vehicles[i]["track_id"] is not None else None,
                     "is_anomaly": True
@@ -188,10 +191,11 @@ def check_crashes(detections: List[Dict[str, Any]]):
                     x2 = vehicles[i+1]["bbox"][2]
                 else:
                     x2 = vehicles[i]["bbox"][2]
+                avg_confidence = (vehicles[i]["confidence"] + vehicles[i+1]["confidence"]) / 2
                 detections.append({
                     "class_id": 103,
                     "class_name": "Crash",
-                    "confidence": 1,
+                    "confidence": avg_confidence,
                     "bbox": [x1,y1,x2,y2],
                     "track_id": vehicles[i]["track_id"] + 200000 if vehicles[i]["track_id"] is not None else None,
                     "is_anomaly": True
@@ -274,10 +278,11 @@ def check_tresspassing(detections: List[Dict[str, Any]], marker_class):
                     # calculate bounding box
                     bbox = get_cluster_bbox(c)
                     # add a trespassing anomaly to detections
+                    avg_confidence = (det["confidence"] + sum(m["confidence"] for m in c)) / (1 + len(c))
                     detections.append({
                     "class_id": 104,
                     "class_name": "trespassing",
-                    "confidence": 1,
+                    "confidence": avg_confidence,
                     "bbox": bbox,
                     "track_id": det["track_id"]+100000,
                     "is_anomaly": True
