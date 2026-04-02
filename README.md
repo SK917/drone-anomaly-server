@@ -117,7 +117,8 @@ If you are running it for the first time, the server may run some initial setup 
 | /detections | Detections data |
 | /stats | Stream stats |
 | /anomalies | Anomaly data for searching |
-| /annotated-frame.jpg | The latest frame processed by the server
+| /annotated-frame.jpg | The latest frame processed by the server |
+| /updates | WebSocket endpoint |
 | /whip | OBS Endpoint |
 | /video-view | Beta frontend view |
 | / | Beta detections list view |
