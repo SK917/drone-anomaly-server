@@ -33,7 +33,7 @@
 </script>
 
 <template>
-    <button 
+    <button
         @click="toggleSelected"
         :class="isSelected ? 'border-red-500 hover:border-red-500' : 'border-gray-600 hover:border-rose-800'"
         class="flex flex-col items-center justify-between p-2 m-2 w-auto h-auto border rounded-sm cursor-pointer"
@@ -46,13 +46,13 @@
         <div class="w-full h-0.5 bg-rose-800 mt-2"></div>
         <div class="p-2 flex flex-col rounded-b-sm gap-2">
             <div class="text-gray-400 text-sm font-orbit">
-                Class: 
+                Class:
                 <span class="text-red-400 font-tektur text-sm">
                     {{ anomaly.class_name }}
                 </span>
             </div>
             <div class="text-gray-400 text-sm font-orbit">
-                Confidence: 
+                Confidence:
                 <span class="text-red-500 font-tektur font-semibold text-sm">
                     {{ confidence }}%
                 </span>

@@ -7,7 +7,7 @@
 
 <template>
     <div class="flex flex-row gap-2 items-baseline bg-slate-950 rounded-sm overflow-x-auto flex-nowrap w-full p-2 detections-scroll">
-            
+
             <div class="flex-none w-48">
                 <AnalyticsCard
                 :num="analyticsStore.minDetection?.confidence ?? 0"

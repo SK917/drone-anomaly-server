@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 import torch
 from PIL import Image
-import anomaly_det
+import server.server_engine.anomaly_det as anomaly_det
 import time
 import matplotlib.pyplot as plt
 
@@ -24,10 +24,10 @@ img_array = cv2.imread('C:/Users/alexm/OneDrive/Desktop/School Code/Capstone Ser
 #img_array = np.array(img, dtype=np.uint8)
 
 results = model.track(
-        img_array, 
-        imgsz=IMG_SIZE, 
-        conf=CONFIDENCE, 
-        device='cpu', 
+        img_array,
+        imgsz=IMG_SIZE,
+        conf=CONFIDENCE,
+        device='cpu',
         verbose=False,
         half=USE_FP16,
         agnostic_nms=True,
@@ -47,22 +47,22 @@ for det in detections:
     x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
     is_anomaly = det.get("is_anomaly", False)
     track_id = det.get("track_id")
-    
+
     # Color: red for anomalies, green for normal
     color = (255, 0, 0) if is_anomaly else (0, 255, 0)
     thickness = 3 if is_anomaly else 2
-    
+
     # Draw bounding box
     cv2.rectangle(img_array, (x1, y1), (x2, y2), color, thickness)
     cv2.circle(img_array, anomaly_det.get_center(det["bbox"]), 1, color, thickness)
     if "next_vector" in det:
         cv2.line(img_array, anomaly_det.get_center(det["bbox"]), det["next_vector"], color, thickness)
-    
+
     # Label with track ID if available
     label = f"{det['class_name']} {det['confidence']*100:.1f}%"
     if track_id is not None:
         label = f"ID:{track_id} {label}"
-    
+
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 0.5
     font_thickness = 2

@@ -49,18 +49,18 @@ export const useExportStore = defineStore("export", () => {
 
     function updateExportRequest(field: keyof ExportRequest, value: boolean) {
         if (!exportRequest.value) return;
-        
+
         const anomalyGroup: (keyof ExportRequest)[] = ['all_anomalies', 'selected_anomalies', 'no_anomalies'];
         const formatGroup: (keyof ExportRequest)[] = ['is_txt', 'is_json'];
-        
+
         if (anomalyGroup.includes(field) && value === true) {
             anomalyGroup.forEach(f => exportRequest.value[f] = false);
         }
-        
+
         if (formatGroup.includes(field) && value === true) {
             formatGroup.forEach(f => exportRequest.value[f] = false);
         }
-        
+
         exportRequest.value[field] = value;
     }
 

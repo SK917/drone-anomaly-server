@@ -14,17 +14,17 @@
 
     const canExport = computed(() => {
         const req = exportStore.exportRequest;
-        
+
         const hasAnomalyOption = req.all_anomalies || req.selected_anomalies || req.no_anomalies;
         if (!hasAnomalyOption) return false;
-        
+
         if (req.no_anomalies) {
             if (!req.current_stream_stats && !req.detections_summary && !req.stats_summary) return false;
         }
 
         const hasFormat = req.is_txt || req.is_json;
         if (!hasFormat) return false;
-        
+
         return true;
     });
 
