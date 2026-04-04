@@ -44,7 +44,7 @@
     <div class="flex flex-col items-end">
         <div class="flex flex-row w-full justify-between mt-4" >
             <div class="mr-4 ml-4 mb-4">
-                <button 
+                <button
                     @click="toggleAnomalies"
                     class="flex flex-row gap-3 items-center cursor-pointer bg-gray-800 rounded-sm p-2 text-gray-400 border border-transparent
                     hover:border-yellow-600 hover:text-white font-orbit text-xs"
@@ -59,7 +59,7 @@
         </div>
         <div class="ml-4 mr-4 w-[calc(100%-2rem)] h-64 bg-gray-800 rounded-sm overflow-x-auto overflow-y-hidden detections-scroll">
             <div class="flex flex-nowrap gap-2 h-full p-2">
-                <div v-if="detectionsStore.groupedDetectionsSorted.length === 0" 
+                <div v-if="detectionsStore.groupedDetectionsSorted.length === 0"
                     class="flex-1 h-full flex items-center justify-center text-gray-400 text-lg text-center font-orbit shrink-0">
                     No detections.
                 </div>
@@ -75,5 +75,5 @@
             </div>
         </div>
     </div>
-    
+
 </template>

@@ -89,7 +89,7 @@
 
 <template>
   <div class="flex flex-col md:flex-row gap-6 md:h-screen md:overflow-hidden bg-slate-900">
-    
+
     <div class="flex flex-col gap-2 justify-between md:basis-[42%] shrink-0 p-4 min-w-0 md:overflow-y-auto detections-scroll">
         <StreamInfo/>
         <VideoFeed/>
@@ -98,12 +98,12 @@
             <Reset/>
             <Settings/>
         </div>
-        
+
     </div>
-    
+
     <div class="flex flex-col gap-6 bg-slate-950 flex-1 min-w-0 h-screen max-h-screen overflow-hidden">
         <DetectionsList class="shrink-0" />
-        <Search class="flex-1 min-h-0" /> 
+        <Search class="flex-1 min-h-0" />
     </div>
 
   </div>

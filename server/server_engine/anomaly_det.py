@@ -253,7 +253,7 @@ def check_tresspassing(detections: List[Dict[str, Any]], marker_class):
             clusters.append(markers[next_cluster_start:i+1])
             next_cluster_start = i+1
         if i == len(markers)-2:
-            clusters.append(markers[next_cluster_start:i+1])
+            clusters.append(markers[next_cluster_start:])
 
     for c in clusters:
         for i in range(len(c)):
@@ -273,8 +273,11 @@ def check_tresspassing(detections: List[Dict[str, Any]], marker_class):
                 points: List[List] = []
                 for marker in c:
                     points.append(marker["center"])
-                print(cv2.pointPolygonTest(np.array(points), get_center(det["bbox"]), False))
-                if cv2.pointPolygonTest(np.array(points), get_center(det["bbox"]), False) > 0:
+                if len(points) < 3:
+                    continue
+                poly = np.array(points, dtype=np.float32)
+                print(cv2.pointPolygonTest(poly, get_center(det["bbox"]), False))
+                if cv2.pointPolygonTest(poly, get_center(det["bbox"]), False) > 0:
                     # calculate bounding box
                     bbox = get_cluster_bbox(c)
                     # add a trespassing anomaly to detections
@@ -284,7 +287,7 @@ def check_tresspassing(detections: List[Dict[str, Any]], marker_class):
                     "class_name": "trespassing",
                     "confidence": avg_confidence,
                     "bbox": bbox,
-                    "track_id": det["track_id"]+100000,
+                    "track_id": det["track_id"] + 100000 if det["track_id"] is not None else None,
                     "is_anomaly": True
                 })
 

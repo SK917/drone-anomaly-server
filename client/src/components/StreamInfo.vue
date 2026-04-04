@@ -29,5 +29,5 @@
             :iconSelect="4"
         />
     </div>
-    
+
 </template>
