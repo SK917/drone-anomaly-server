@@ -17,8 +17,8 @@ class HybridTracker:
     def reset(self):
         self.__init__()
 
-    def update(self, detections):
-        if not detections:
+    def update(self, detections, frame=None):
+        if not detections or frame is None:
             return []
 
         dets = []
@@ -30,7 +30,7 @@ class HybridTracker:
 
         dets = np.array(dets, dtype=np.float32)
 
-        tracks = self.tracker.update(dets)
+        tracks = self.tracker.update(dets, frame)
 
         matched = set()
 

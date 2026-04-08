@@ -87,7 +87,7 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
 
     # send to the logic based anomaly detector
     detections = anomaly_det.get_anomalies(results, anomaly_classes, [8, 8, 1])
-    detections = tracker.update(detections)
+    detections = tracker.update(detections, frame_bgr)
 
     return detections, infms
 
@@ -164,9 +164,6 @@ async def inference_worker():
     # Avoid bowing up the terminal
     log_every = 20
 
-    # Flip this to false during the demo so our server doesn't blow up the terminal
-    log_bboxes = True
-
     print("Inference Worker Initialized!")
 
     # this basically just runs until valm kills it. As new frames come in from the stream
@@ -216,8 +213,7 @@ async def inference_worker():
             detections, infer_ms = await asyncio.to_thread(_run_yolo_on_frame, img)
 
             # TODO: comment this out in demo
-            if log_bboxes:
-                debug_print_bbox_sizes(detections)
+            # debug_print_bbox_sizes(detections)
 
             state.inference_count += 1
             current_time = time.time()
