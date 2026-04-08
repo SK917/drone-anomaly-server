@@ -276,7 +276,7 @@ def check_tresspassing(detections: List[Dict[str, Any]], marker_class):
                 if len(points) < 3:
                     continue
                 poly = np.array(points, dtype=np.float32)
-                print(cv2.pointPolygonTest(poly, get_center(det["bbox"]), False))
+                # print(cv2.pointPolygonTest(poly, get_center(det["bbox"]), False))
                 if cv2.pointPolygonTest(poly, get_center(det["bbox"]), False) > 0:
                     # calculate bounding box
                     bbox = get_cluster_bbox(c)

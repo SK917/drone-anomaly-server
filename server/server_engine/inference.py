@@ -62,7 +62,7 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
     img_size = 640
 
     # The model is a bit conservative so we need to lower the confidence to ensure things get detected
-    confidence = 0.50
+    confidence = 0.35
 
     # Half precision speeds up inference without really tanking accuracy (since our laptops use Nvidia chips)
     # We can toggle this though to see if it helps catch some detections
@@ -164,6 +164,9 @@ async def inference_worker():
     # Avoid bowing up the terminal
     log_every = 20
 
+    # enables debug info
+    debug = False
+
     print("Inference Worker Initialized!")
 
     # this basically just runs until valm kills it. As new frames come in from the stream
@@ -203,7 +206,7 @@ async def inference_worker():
                 continue
 
             # should be around 3-4 frames
-            if frames_drained > 1 and state.inference_count % log_every == 0:
+            if frames_drained > 1 and state.inference_count % log_every == 0 and debug:
                 print(f"Drained {frames_drained} Frames")
 
             img = latest_frame.to_ndarray(format="bgr24")
@@ -285,14 +288,14 @@ async def inference_worker():
                         state.anomalies_list.clear()
                         state.anomalies_by_track_id.clear()
 
-            if detections and state.inference_count % log_every == 0:
+            if detections and state.inference_count % log_every == 0 and debug:
                 print(f"\n[INFERENCE #{state.inference_count}] @ {state.inference_fps:.1f} FPS - Found {len(detections)} object(s) ({infer_ms:.1f}ms):")
                 for i, d in enumerate(detections, 1):
                     print(f"  {i}. {d['class_name']} ({d['confidence']*100:.1f}%)")
-            elif not detections and state.inference_count % log_every == 0:
+            elif not detections and state.inference_count % log_every == 0 and debug:
                 print(f"[INFERENCE #{state.inference_count}] @ {state.inference_fps:.1f} FPS - No objects detected ({infer_ms:.1f}ms)")
 
-            if anomalies:
+            if anomalies and debug:
                 print(f"ANOMALY: {', '.join([a['class_name'] for a in anomalies])}")
 
         except Exception as e:

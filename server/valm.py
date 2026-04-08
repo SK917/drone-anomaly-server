@@ -98,4 +98,4 @@ app.include_router(ws_router)
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host=HOST, port=PORT, log_level="info", ws="websockets")
+    uvicorn.run(app, host=HOST, port=PORT, log_level="error", ws="websockets")
