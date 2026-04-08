@@ -55,14 +55,14 @@ async def get_stats():
 # Use ultralytics built in tracking support with custom bytetrack algorithm
 def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], float]:
     # TODO: UPDATE THIS TO ADD ANOMALIESSSSS
-    anomaly_classes = ["pig", "fire", "wolf", "deer", "trespassing", "crash"]
+    anomaly_classes = state.anomaly_classes
 
     # image size 640 because the larger it gets the slower inference gets and it seems good enough for detections
     # the model I am trainig is also being trainned on 640 to match this so if we do change it I'll retrain it.
     img_size = 640
 
     # The model is a bit conservative so we need to lower the confidence to ensure things get detected
-    confidence = 0.35
+    confidence = 0.50
 
     # Half precision speeds up inference without really tanking accuracy (since our laptops use Nvidia chips)
     # We can toggle this though to see if it helps catch some detections

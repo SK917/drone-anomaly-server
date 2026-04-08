@@ -79,7 +79,7 @@ async def annotation_worker():
                     frame_counter += 1
                     if frame_counter % 2 == 0:
                         await manager.broadcast({"type": "NEW_FRAME"})
-                    if frame_counter >= 4:
+                    # if frame_counter >= 4:
                         anomalies_snapshot = [d for d in detections_copy if d.get('is_anomaly', False)]
 
                         await manager.broadcast({

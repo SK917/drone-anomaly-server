@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 
     torch.set_grad_enabled(False)
 
-    model_path = "models/turtle.pt"
+    model_path = "models/ant.pt"
     state.model = await asyncio.to_thread(YOLO, model_path)
     await asyncio.to_thread(state.model.to, state.device)
 

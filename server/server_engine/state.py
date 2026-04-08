@@ -8,6 +8,9 @@ from ultralytics import YOLO
 pc: Optional[aiortc.RTCPeerConnection] = None
 ingest_video_track = None
 
+# Anomaly class list
+anomaly_classes: List[str] = ["pig", "fire", "wolf", "deer", "trespassing", "crash", "traffic jam", "crowding"]
+
 # YOLO stuff
 model: Optional[YOLO] = None
 device: str = "cpu"
