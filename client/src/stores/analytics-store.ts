@@ -92,7 +92,7 @@ export const useAnalyticsStore = defineStore("analytics", () => {
 
         const objectEntries = Object.values(detectionCounts)
             .filter(e => !e.detection.is_anomaly);
-        
+
         const bestObject = objectEntries.length > 0
             ? objectEntries.reduce((max, entry) =>
                 entry.detection.confidence > max.detection.confidence ? entry : max

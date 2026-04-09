@@ -36,6 +36,7 @@
         anomaliesStore.resetAnomalies();
         detectionsStore.resetCounts();
         exportStore.resetExportRequest();
+        exportStore.deselectAll();
         analyticsStore.resetAnalytics();
 
         toggleSettingsPopup();

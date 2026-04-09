@@ -43,7 +43,7 @@
                 {{ detect.class_name }}
             </div>
         </div>
-        
+
         <div class="text-sm">
             <span class="font-orbit text-gray-400">Seen: </span><span class="font-tektur text-red-500 font-semibold">{{ numDetects }}</span>
         </div>
@@ -51,7 +51,7 @@
         </div>
         <div class="p-2 flex flex-col rounded-b-sm gap-2">
             <div class="text-gray-400 text-xs font-orbit">
-                Highest Confidence: 
+                Highest Confidence:
                 <span class="text-red-500 font-tektur font-semibold text-sm">
                     {{ confidence }}%
                 </span>
@@ -79,7 +79,7 @@
         </div>
         <div class="p-2 flex flex-col rounded-b-sm gap-2">
             <div class="text-gray-400 text-xs font-orbit">
-                Highest Confidence: 
+                Highest Confidence:
                 <span class="text-lime-600 font-tektur font-semibold text-sm">
                     {{ confidence }}%
                 </span>

@@ -46,7 +46,7 @@
 </script>
 
 <template>
-    <button 
+    <button
         @click="toggle"
         :class="[
             isRowDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:text-gray-200',

@@ -27,7 +27,7 @@ export default router;
 
 
 
-/* 
+/*
 //old stuff
 import { createRouter, createWebHistory } from 'vue-router'
 
