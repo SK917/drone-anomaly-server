@@ -62,7 +62,7 @@ def _run_yolo_on_frame(frame_bgr: np.ndarray) -> tuple[List[Dict[str, Any]], flo
     img_size = 640
 
     # The model is a bit conservative so we need to lower the confidence to ensure things get detected
-    confidence = 0.35
+    confidence = 0.5
 
     # Half precision speeds up inference without really tanking accuracy (since our laptops use Nvidia chips)
     # We can toggle this though to see if it helps catch some detections
