@@ -24,8 +24,10 @@
     const exportStore = useExportStore();
     const socketStore = useSocketStore();
 
+    const apiHost = import.meta.env.VITE_API_BASE_URL.replace('http://', '').replace('https://', '');
+
     onMounted(() => {
-        socketStore.socket = new WebSocket("ws://localhost:8000/updates");
+        socketStore.socket = new WebSocket(`ws://${apiHost}/updates`);
         exportStore.initSelection();
         const s = socketStore.socket;
 
