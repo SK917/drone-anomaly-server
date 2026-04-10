@@ -1,13 +1,13 @@
-# Welcome to the Server portion of the NG-06 Capstone Project
+# Welcome to the NG-06 Capstone Project!
 
-This repository contains the frontend and backend portion of the server for the NG-06 Capstone Project for TMU. It provides a viewing interface for the user to view frames sent into an object detection model. 
+This repository contains the frontend dashboard and backend inference server for the TMU NG-06 Capstone Project. It provides a viewing interface for you to view frames sent into an object detection model, letting you watch detections and analytics be calculated in real-time. 
 
 To set up this project on your local machine, follow the steps outlined below.
 
 ## Project Setup
 ### Prerequisites
 This project requires the following:
-- Python 3.12+
+- Python 3.10+
 - Node.js 24.13.0+
 - OBS
 - Vue Extension for VS Code
@@ -35,7 +35,7 @@ The frontend uses Vue.js as its framework, which requires npm (and Node.js) to r
  #### 4. Vue Extension Installation
  Go to the extension panel on VS Code and look for `Vue (Official)`. The publisher is vue.js.org. Alternatively, you can find the link to the extension [here](https://marketplace.visualstudio.com/items?itemName=Vue.volar). Click install, and you should be good to go. This extension is required for TypeScript to recognize the .vue files in the project.
 
-### First Setup
+### First-Time Setup
 1. Clone the repository to your intended directory:
 ```git bash
 git clone https://github.com/SK917/drone-anomaly-server.git
@@ -106,11 +106,12 @@ It is recommended to have two terminal windows active - one for the frontend and
 
 3. Run the server:
 ```bash
-python hybrid_server.py
+python valm.py
 ```
-> Note: You may see multiple versions of the server in this repository. The one listed here is the most up-to-date one.
 
-If you are running it for the first time, the server may run some initial setup tasks. When this is done, you will see the server running at http://localhost:8000. It has the following endpoints:
+> Note: Running the VALM server requires a suitable YOLOv11 model to be present in the `server/` directory.  Update the `model_path` variable in `valm.py` to reflect its location (and name) on the disk.
+
+If you are running it for the first time, the server may run some initial setup tasks. When this is done, you will see the server running at http://localhost:8000. It exposes the following endpoints:
 
 | Endpoint | Description|
 |----------|------------|
@@ -120,8 +121,6 @@ If you are running it for the first time, the server may run some initial setup 
 | /annotated-frame.jpg | The latest frame processed by the server |
 | /updates | WebSocket endpoint |
 | /whip | OBS Endpoint |
-| /video-view | Beta frontend view |
-| / | Beta detections list view |
 
 Next, start OBS by clicking the `Start Streaming` button. After this, we can start up the frontend.
 
@@ -133,9 +132,7 @@ Next, start OBS by clicking the `Start Streaming` button. After this, we can sta
 npm run dev
 ```
 
-The frontend uses the default Vue.js endpoint of http://localhost:5173. Currently, there are no additional endpoints, but we are looking to add some in the future.
-
-If you visit the frontend now, you should be able to see your video streaming, as well as the list of detections picked up by our object detection model.
+The frontend uses the default Vue.js endpoint of http://localhost:5173. Visiting it will bring you to the analytics dashboard, where you can view detections happening in real-time!
 
 ### Stopping the Project
 To shut down the project, simply:
