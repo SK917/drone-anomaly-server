@@ -1,5 +1,5 @@
 <script setup lang="ts">
-
+    const teamMembers = import.meta.env.VITE_TEAM_MEMBERS || "";
 </script>
 
 <template>
@@ -8,7 +8,7 @@
             NG-06 TMU Engineering Capstone
         </div>
         <div class="text-right">
-            Matthew Trieu, Alex Meng, Vlad Scraba, Leanna Manuelpillai
+            {{ teamMembers }}
         </div>
     </footer>
 </template>
