@@ -5,7 +5,7 @@
     import { useAnalyticsStore } from '@/stores/analytics-store';
     import type { Detection, DetectionsResponse } from '@/services/types';
     import DetectionCard from './DetectionCard.vue';
-    import Export from './Export.vue';
+    import Export from '../Export/Export.vue';
     import { RefreshCw } from 'lucide-vue-next';
 
     const detectionsStore = useDetectionsStore();

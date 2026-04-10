@@ -8,14 +8,13 @@
     import { useExportStore } from '@/stores/export-store';
     import { useSocketStore } from '@/stores/socket-store';
     import type { DetectionsResponse, StatsResponse } from '@/services/types';
-    import StreamInfo from '@/components/StreamInfo.vue';
+    import StreamInfo from '@/components/Analytics/StreamInfo.vue';
     import VideoFeed from '@/components/VideoFeed.vue';
-    import DetectionsList from '@/components/DetectionsList.vue';
-    import AnalyticsList from '@/components/AnalyticsList.vue';
-    import Search from '@/components/Search.vue';
-    import Settings from '@/components/Settings.vue';
-    import Reset from '@/components/Reset.vue';
-    import DevInfo from '@/components/DevInfo.vue';
+    import DetectionsList from '@/components/Detections/DetectionsList.vue';
+    import AnalyticsList from '@/components/Analytics/AnalyticsList.vue';
+    import Search from '@/components/Search/Search.vue';
+    import Settings from '@/components/Configuration/Settings.vue';
+    import Reset from '@/components/Configuration/Reset.vue';
 
     const detectionsStore = useDetectionsStore();
     const statsStore = useStatsStore();
